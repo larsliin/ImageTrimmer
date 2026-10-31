@@ -1,9 +1,14 @@
 <script setup lang="ts">
-    import { computed, shallowRef, useTemplateRef, watch } from 'vue';
-    import { PAN_TOOL, EDIT_TOOLS, PAINT_TOOLS, type ToolId } from '@/types/editor';
+    import { nextTick, shallowRef, useTemplateRef, watch } from 'vue';
+    import {
+        ADJUSTMENT_TOOLS,
+        PAINT_TOOLS,
+        PAN_TOOL,
+        TRANSFORM_TOOLS,
+        type ToolId,
+    } from '@/types/editor';
     import { useOverflowCollapse } from '@/composables/useOverflowCollapse';
     import EditorToolGroups from './EditorToolGroups.vue';
-    import EditorToolFoldout from './EditorToolFoldout.vue';
     import PanIcon from '@/components/editor/icons/PanIcon.vue';
     import UndoIcon from '@/components/editor/icons/UndoIcon.vue';
     import RedoIcon from '@/components/editor/icons/RedoIcon.vue';
@@ -33,23 +38,88 @@
         redo: []
     }>();
 
-    const FOLDOUT_TOOL_IDS: readonly ToolId[] = [
-        ...EDIT_TOOLS.map((tool) => tool.id),
-        ...PAINT_TOOLS.map((tool) => tool.id),
-    ];
+    type ToolGroupId = 'adjustment' | 'paint' | 'transform';
+    const COLLAPSE_ORDER: readonly ToolGroupId[] = ['adjustment', 'paint', 'transform'];
+    const TOOLS_BY_GROUP = {
+        adjustment: ADJUSTMENT_TOOLS,
+        paint: PAINT_TOOLS,
+        transform: TRANSFORM_TOOLS,
+    } as const;
 
     const rail = useTemplateRef<HTMLElement>('rail');
-    const { collapsed } = useOverflowCollapse(rail);
-    const foldoutOpen = shallowRef(false);
-    const foldoutToolActive = computed(() => props.activeTool !== null && FOLDOUT_TOOL_IDS.includes(props.activeTool));
+    const { collapsedCount } = useOverflowCollapse(rail);
+    const moreToolsOpen = shallowRef(false);
 
-    watch(collapsed, () => {
-        foldoutOpen.value = false;
+    function groupForTool(tool: string | null | undefined): ToolGroupId | null {
+        if (TOOLS_BY_GROUP.transform.some((item) => item.id === tool)) return 'transform';
+        if (TOOLS_BY_GROUP.paint.some((item) => item.id === tool)) return 'paint';
+        if (TOOLS_BY_GROUP.adjustment.some((item) => item.id === tool)) return 'adjustment';
+        return null;
+    }
+
+    function isToolGroupId(value: string | null | undefined): value is ToolGroupId {
+        return value === 'adjustment' || value === 'paint' || value === 'transform';
+    }
+
+    function groupIsCollapsed(group: ToolGroupId) {
+        return COLLAPSE_ORDER.indexOf(group) < collapsedCount.value;
+    }
+
+    function focusRailTarget(selector: string) {
+        if (
+            props.popupOpen
+            || !rail.value
+            || (typeof rail.value.closest === 'function' && rail.value.closest('[inert]'))
+            || typeof rail.value.querySelector !== 'function'
+        ) return;
+        const target = rail.value.querySelector<HTMLButtonElement>(selector);
+        const fallback = rail.value.querySelector<HTMLButtonElement>('[aria-label="Import image"]');
+        const focusTarget = target && !target.disabled ? target : fallback;
+        if (focusTarget && !focusTarget.disabled) focusTarget.focus();
+    }
+
+    function focusMoreToolsLauncher() {
+        focusRailTarget('[data-more-tools-launcher="true"]');
+    }
+
+    function focusTool(group: ToolGroupId, tool: string | null | undefined) {
+        const targetTool = groupForTool(tool) === group
+            ? tool
+            : TOOLS_BY_GROUP[group][0]?.id ?? null;
+        if (targetTool) focusRailTarget(`[data-tool-id="${targetTool}"]`);
+    }
+
+    watch(collapsedCount, (count, previousCount) => {
+        const activeElement = typeof document === 'undefined' ? null : document.activeElement;
+        const focusedGroup = activeElement?.getAttribute('data-tool-group');
+        const focusedTool = activeElement?.getAttribute('data-tool-id');
+        const newlyCollapsed = COLLAPSE_ORDER.slice(previousCount, count);
+
+        if (isToolGroupId(focusedGroup) && newlyCollapsed.includes(focusedGroup)) {
+            void nextTick(focusMoreToolsLauncher);
+        }
+
+        if (count < previousCount && moreToolsOpen.value) {
+            const restoredGroups = COLLAPSE_ORDER.slice(count, previousCount);
+            if ((isToolGroupId(focusedGroup) && restoredGroups.includes(focusedGroup)) || count === 0) {
+                moreToolsOpen.value = false;
+                const group = isToolGroupId(focusedGroup) && restoredGroups.includes(focusedGroup)
+                    ? focusedGroup
+                    : restoredGroups.at(-1);
+                if (group) void nextTick(() => focusTool(group, focusedTool));
+            }
+        }
+    });
+
+    watch(() => props.popupOpen, (isOpen) => {
+        if (isOpen) moreToolsOpen.value = false;
     });
 
     function selectTool(tool: ToolId) {
-        foldoutOpen.value = false;
+        const returnFocus = moreToolsOpen.value;
+        moreToolsOpen.value = false;
         emit('select-tool', tool);
+        if (returnFocus) void nextTick(focusMoreToolsLauncher);
     }
 </script>
 
@@ -102,30 +172,17 @@
 
             <hr class="separator" />
 
-            <EditorToolFoldout
-                v-if="collapsed"
-                v-model:open="foldoutOpen"
-                label="More tools"
-                :active="foldoutToolActive"
-            >
-                <EditorToolGroups
-                    layout="foldout"
-                    :active-tool="activeTool"
-                    :has-image="hasImage"
-                    :busy="busy"
-                    @select-tool="selectTool"
-                />
-            </EditorToolFoldout>
             <EditorToolGroups
-                v-else
-                layout="rail"
                 :active-tool="activeTool"
                 :has-image="hasImage"
                 :busy="busy"
+                :collapsed-count="collapsedCount"
+                :more-tools-open="moreToolsOpen"
+                @update:more-tools-open="moreToolsOpen = $event"
                 @select-tool="selectTool"
             />
 
-            <hr v-if="collapsed" class="separator" />
+            <hr class="separator" />
 
             <div class="tool-group" role="group" aria-label="View tools">
                 <BaseButton
@@ -178,8 +235,16 @@
     width: 48px;
     min-height: 0;
     padding: 8px 0;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
     background-color: var(--color-panel);
     border-right: 1px solid var(--color-border);
+}
+
+.tool-rail :deep(.tool-group),
+.tool-rail :deep(.separator),
+.tool-rail :deep(.tool-foldout) {
+    flex-shrink: 0;
 }
 </style>

@@ -68,12 +68,21 @@
     }
 
     function closeOnFocusLeave(event: FocusEvent) {
-        if (event.relatedTarget instanceof Node && !root.value?.contains(event.relatedTarget)) open.value = false;
+        if (
+            open.value
+            && event.relatedTarget instanceof Node
+            && !root.value?.contains(event.relatedTarget)
+        ) open.value = false;
     }
 </script>
 
 <template>
-    <div ref="root" class="tool-foldout" @keydown="closeOnEscape" @focusout="closeOnFocusLeave">
+    <div
+        ref="root"
+        class="tool-foldout"
+        @keydown="closeOnEscape"
+        @focusout="closeOnFocusLeave"
+    >
         <BaseButton
             ref="toggleButton"
             variant="tool"
@@ -82,9 +91,12 @@
             :title="label"
             :aria-expanded="open"
             :aria-controls="panelId"
+            data-more-tools-launcher="true"
             @click="open = !open"
         >
-            <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+            <slot name="icon">
+                <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+            </slot>
         </BaseButton>
         <div
             v-show="open"
@@ -104,8 +116,14 @@
 .tool-foldout__panel {
     position: fixed;
     z-index: 30;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
     box-sizing: border-box;
     padding: 6px;
+    overflow-x: auto;
     overflow-y: auto;
     background-color: var(--color-panel);
     border: 1px solid var(--color-border);

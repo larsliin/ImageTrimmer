@@ -1,36 +1,65 @@
 import { nextTick, onBeforeUnmount, onMounted, shallowRef, type Ref } from 'vue';
 
 /**
- * Collapses when the container's content overflows its height, and expands again once the
- * container is tall enough to fit the content it had when it collapsed.
+ * Progressively collapses groups from the bottom as the container overflows, and restores
+ * them in reverse as the container grows. The final state is allowed to scroll if it still
+ * cannot fit.
  */
 export function useOverflowCollapse(container: Readonly<Ref<HTMLElement | null>>) {
-    const collapsed = shallowRef(false);
-    let expandedHeight = 0;
+    const collapsedCount = shallowRef(0);
+    const maxCollapsedCount = 3;
     let observer: ResizeObserver | null = null;
+    let updating = false;
+    let updateRequested = false;
 
-    function update() {
+    async function reconcile() {
         const element = container.value;
         if (!element) return;
-        if (!collapsed.value) {
+
+        while (collapsedCount.value > 0) {
+            const previousCount = collapsedCount.value;
+            collapsedCount.value -= 1;
+            await nextTick();
             if (element.scrollHeight > element.clientHeight + 1) {
-                expandedHeight = element.scrollHeight;
-                collapsed.value = true;
+                collapsedCount.value = previousCount;
+                await nextTick();
+                break;
             }
-        } else if (element.clientHeight >= expandedHeight) {
-            collapsed.value = false;
-            void nextTick(update);
+        }
+
+        while (
+            collapsedCount.value < maxCollapsedCount
+            && element.scrollHeight > element.clientHeight + 1
+        ) {
+            collapsedCount.value += 1;
+            await nextTick();
+        }
+    }
+
+    async function update() {
+        if (updating) {
+            updateRequested = true;
+            return;
+        }
+        updating = true;
+        try {
+            do {
+                updateRequested = false;
+                await reconcile();
+            } while (updateRequested);
+        } finally {
+            updating = false;
         }
     }
 
     onMounted(() => {
         if (!container.value) return;
-        observer = new ResizeObserver(update);
+        observer = new ResizeObserver(() => void update());
         observer.observe(container.value);
-        update();
+        void update();
     });
 
     onBeforeUnmount(() => observer?.disconnect());
 
-    return { collapsed, update };
+    return { collapsedCount, update };
 }

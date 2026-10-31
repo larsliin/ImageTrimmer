@@ -71,11 +71,15 @@ function loadComponentUrl(path: string): Promise<string> {
 const editorToolRail: Component = (await import(
     await loadComponentUrl(fileURLToPath(new URL('../EditorToolRail.vue', import.meta.url))),
 )).default;
+let resizeObservers = new Set<() => void>();
 
 interface RailSize {
     clientHeight: number
     scrollHeight: number
+    scrollHeightsByCollapsedCount?: readonly number[]
 }
+
+let focusedTestElement: TestElement | null = null;
 
 class TestElement {
     readonly props: Record<string, unknown> = {};
@@ -84,19 +88,51 @@ class TestElement {
     parent: TestElement | null = null;
     text = '';
     clientHeight = 0;
-    scrollHeight = 0;
+    private measuredScrollHeight = 0;
     readonly type: string;
+    private readonly railSize: RailSize;
 
     constructor(type: string, railSize: RailSize) {
         this.type = type;
+        this.railSize = railSize;
         if (type === 'nav') {
             this.clientHeight = railSize.clientHeight;
-            this.scrollHeight = railSize.scrollHeight;
+            this.measuredScrollHeight = railSize.scrollHeight;
         }
+    }
+
+    get scrollHeight() {
+        const heights = this.railSize.scrollHeightsByCollapsedCount;
+        if (this.type !== 'nav' || !heights) return this.measuredScrollHeight;
+        const panel = findElement(this, 'class', 'tool-foldout__panel');
+        const collapsedGroups = panel ? getPopupGroupLabels(panel).length : 0;
+        return heights[collapsedGroups] ?? this.measuredScrollHeight;
+    }
+
+    set scrollHeight(value: number) {
+        this.measuredScrollHeight = value;
+    }
+
+    get disabled() {
+        return this.props.disabled === true;
+    }
+
+    getAttribute(name: string) {
+        const value = this.props[name];
+        return typeof value === 'string' ? value : null;
+    }
+
+    querySelector(selector: string) {
+        const match = selector.match(/^\[([\w-]+)="([^"]+)"\]$/);
+        return match ? findElement(this, match[1], match[2]) : null;
     }
 
     getBoundingClientRect() {
         return { top: 24, right: 48 } as DOMRect;
+    }
+
+    focus() {
+        focusedTestElement = this;
     }
 }
 
@@ -181,7 +217,13 @@ function mountRail(railSize: RailSize, props: RailProps = {}) {
     });
     const root = markRaw(new TestElement('root', railSize));
     app.mount(root);
-    return { app, emitted, root };
+    function updateProps(nextProps: Partial<RailProps>) {
+        const instance = app._instance;
+        assert.ok(instance, 'the rail app should be mounted');
+        Object.assign(instance.props, nextProps);
+    }
+
+    return { app, emitted, root, updateProps };
 }
 
 function findElement(root: TestElement, property: string, value: string): TestElement | null {
@@ -198,10 +240,36 @@ function findElements(root: TestElement, property: string, value: string): TestE
     return matches.concat(...root.children.map((child) => findElements(child, property, value)));
 }
 
-function findFoldoutPanel(root: TestElement): TestElement | null {
-    if (root.props.role === 'group' && root.props['aria-label'] === 'More tools') return root;
+async function readComponentStyles(path: string) {
+    const source = await readFile(resolve(process.cwd(), path), 'utf8');
+    return parse(source, { filename: path }).descriptor.styles
+        .map((style) => style.content)
+        .join('\n');
+}
+
+function countElementsWithProperty(root: TestElement, property: string): number {
+    return Number(property in root.props)
+        + root.children.reduce((count, child) => count + countElementsWithProperty(child, property), 0);
+}
+
+function getToolIds(root: TestElement): string[] {
+    const toolId = root.props['data-tool-id'];
+    return [
+        ...(typeof toolId === 'string' ? [toolId] : []),
+        ...root.children.flatMap(getToolIds),
+    ];
+}
+
+function getPopupGroupLabels(root: TestElement): string[] {
+    return findElements(root, 'role', 'group')
+        .map((element) => element.props['aria-label'])
+        .filter((label): label is string => typeof label === 'string' && label !== 'More tools');
+}
+
+function findFoldoutPanel(root: TestElement, label: string): TestElement | null {
+    if (root.props.role === 'group' && root.props['aria-label'] === label) return root;
     for (const child of root.children) {
-        const match = findFoldoutPanel(child);
+        const match = findFoldoutPanel(child, label);
         if (match) return match;
     }
     return null;
@@ -216,8 +284,46 @@ function isWithin(element: TestElement, ancestor: TestElement): boolean {
     return false;
 }
 
+function findMoreToolsLauncher(root: TestElement): TestElement | null {
+    return findElement(root, 'data-more-tools-launcher', 'true');
+}
+
+function assertToolGroupRailOrder(root: TestElement, expected: readonly string[]) {
+    const groups = findElement(root, 'class', 'tool-groups');
+    assert.ok(groups);
+    const order = groups.children
+        .filter((child) => child.type !== '#text' && child.type !== '#comment')
+        .map((child) => {
+            if (child.type === 'hr') return 'divider';
+            if (child.props.class === 'tool-foldout') return 'launcher';
+            return child.props['aria-label'];
+        });
+    assert.deepEqual(order, expected);
+}
+
+function assertMoreToolsLauncher(root: TestElement) {
+    const launcher = findMoreToolsLauncher(root);
+    assert.ok(launcher, 'the shared launcher should render');
+    assert.equal(findElements(root, 'data-more-tools-launcher', 'true').length, 1);
+    assert.equal(countElementsWithProperty(root, 'data-group-launcher'), 0);
+    const iconClasses = findElements(launcher, 'tag', 'i').map((icon) => String(icon.props.class));
+    assert.deepEqual(iconClasses, ['bi bi-three-dots-vertical']);
+    const groups = findElement(root, 'class', 'tool-groups');
+    assert.ok(groups);
+    assert.equal(launcher.parent?.parent, groups, 'the launcher stays in the Adjustment slot');
+    const laterGroupElements = groups.children
+        .slice(groups.children.indexOf(launcher.parent!) + 1)
+        .filter((child) => child.type !== '#text' && child.type !== '#comment');
+    assert.equal(laterGroupElements.length, 0, 'the launcher remains at the end of the edit-tool cluster');
+    const nextElement = groups.parent?.children
+        .slice((groups.parent?.children.indexOf(groups) ?? -1) + 1)
+        .find((child) => child.type !== '#text' && child.type !== '#comment');
+    assert.equal(nextElement?.type, 'hr', 'the launcher stays before the View separator');
+}
+
 async function click(element: TestElement | null) {
     assert.ok(element, 'the target button should render');
+    element.focus();
     const handler = element.props.onClick;
     assert.ok(typeof handler === 'function' || Array.isArray(handler), 'the button should have a click handler');
     for (const callback of Array.isArray(handler) ? handler : [handler]) {
@@ -226,11 +332,18 @@ async function click(element: TestElement | null) {
 }
 
 function installBrowserMocks() {
+    resizeObservers = new Set();
+    focusedTestElement = null;
     class TestResizeObserver {
         private readonly callback: ResizeObserverCallback;
-        constructor(callback: ResizeObserverCallback) { this.callback = callback; }
+        private readonly notify: () => void;
+        constructor(callback: ResizeObserverCallback) {
+            this.callback = callback;
+            this.notify = () => this.callback([], this as unknown as ResizeObserver);
+            resizeObservers.add(this.notify);
+        }
         observe() { this.callback([], this as unknown as ResizeObserver); }
-        disconnect() {}
+        disconnect() { resizeObservers.delete(this.notify); }
     }
     Object.defineProperty(globalThis, 'ResizeObserver', { configurable: true, value: TestResizeObserver });
     Object.defineProperty(globalThis, 'window', {
@@ -239,50 +352,106 @@ function installBrowserMocks() {
     });
     Object.defineProperty(globalThis, 'document', {
         configurable: true,
-        value: { addEventListener() {}, removeEventListener() {} },
+        value: {
+            get activeElement() { return focusedTestElement; },
+            addEventListener() {},
+            removeEventListener() {},
+        },
     });
 }
 
-test('collapsed rail keeps view tools outside the edit foldout and preserves tool actions', async (context) => {
-    installBrowserMocks();
-    const { app, emitted, root } = mountRail({ clientHeight: 100, scrollHeight: 500 });
-    context.after(() => app.unmount());
-    await nextTick();
+function triggerResizeObservers() {
+    for (const notify of resizeObservers) notify();
+}
 
-    const toggle = findElement(root, 'aria-label', 'More tools');
+async function settleLayout() {
+    for (let index = 0; index < 8; index += 1) await nextTick();
+}
+
+test('one shared popup combines collapsed groups and preserves fixed tool actions', async (context) => {
+    installBrowserMocks();
+    const { app, emitted, root } = mountRail({
+        clientHeight: 250,
+        scrollHeight: 500,
+        scrollHeightsByCollapsedCount: [500, 300, 180, 120],
+    }, { activeTool: 'brush' });
+    context.after(() => app.unmount());
+    await settleLayout();
+
+    const launcher = findMoreToolsLauncher(root);
+    const transformGroup = findElement(root, 'aria-label', 'Transform tools');
     const zoomIn = findElement(root, 'aria-label', 'Zoom in');
     const zoomOut = findElement(root, 'aria-label', 'Zoom out');
     const pan = findElement(root, 'aria-label', 'Pan');
-    assert.ok(toggle && zoomIn && zoomOut && pan);
-    const panel = findFoldoutPanel(root);
+    assert.ok(launcher && transformGroup && zoomIn && zoomOut && pan);
+    assert.equal(launcher.props['aria-label'], 'More tools');
+    assert.equal(launcher.props['aria-expanded'], false);
+    assertMoreToolsLauncher(root);
+    assertToolGroupRailOrder(root, ['Transform tools', 'divider', 'launcher']);
+    assert.equal(findElement(root, 'aria-label', 'Crop')?.props['aria-pressed'], false);
+    assert.equal(findElement(root, 'aria-label', 'Brush')?.props['aria-pressed'], true);
+
+    const panel = findFoldoutPanel(root, 'More tools');
     assert.ok(panel);
-    assert.equal(panel.props['aria-label'], 'More tools');
-    assert.equal(isWithin(zoomIn, panel), false);
-    assert.equal(isWithin(zoomOut, panel), false);
-    assert.equal(isWithin(pan, panel), false);
-
-    await click(toggle);
-    await nextTick();
-    assert.equal(toggle.props['aria-expanded'], true);
-    assert.equal(findElements(panel, 'tag', 'hr').length, 2, 'More tools should keep only internal separators');
-    for (const label of [
-        'Crop', 'Resize', 'Rotate image', 'Brush', 'Levels', 'Curves', 'Brightness/Contrast', 'Color mode',
-    ]) {
-        assert.ok(findElement(panel, 'aria-label', label), `${label} should be available in More tools`);
-    }
-    for (const label of ['Import image', 'Export', 'Undo', 'Redo', 'Zoom in', 'Zoom out', 'Pan']) {
-        assert.equal(findElement(panel, 'aria-label', label), null, `${label} should stay outside More tools`);
+    assert.equal(launcher.props['aria-controls'], panel.props.id);
+    for (const fixedTool of [zoomIn, zoomOut, pan]) {
+        assert.equal(isWithin(fixedTool, panel), false);
     }
 
-    await click(pan);
-    await nextTick();
-    assert.equal(toggle.props['aria-expanded'], false);
-    assert.deepEqual(emitted, [{ name: 'select-tool', value: 'pan' }]);
+    await click(launcher);
+    await settleLayout();
+    assert.equal(launcher.props['aria-expanded'], true);
+    assert.deepEqual(getPopupGroupLabels(panel), ['Paint tools', 'Adjustment tools']);
+    assert.deepEqual(
+        findElements(panel, 'tag', 'hr').length,
+        1,
+        'collapsed groups retain their divider boundary',
+    );
+    const popupDividers = findElements(panel, 'role', 'separator');
+    assert.equal(popupDividers.length, 1);
+    assert.equal(popupDividers[0]?.props['aria-orientation'], 'vertical');
+    const groupStyles = await readComponentStyles('src/components/editor/chrome/EditorToolGroups.vue');
+    const foldoutStyles = await readComponentStyles('src/components/editor/chrome/EditorToolFoldout.vue');
+    assert.match(
+        groupStyles,
+        /\.tool-group--popup\s*\{[^}]*flex-direction:\s*row;[^}]*flex-wrap:\s*nowrap;/s,
+        'buttons in each collapsed group remain in one non-wrapping row',
+    );
+    assert.match(
+        foldoutStyles,
+        /\.tool-foldout__panel\s*\{[^}]*flex-direction:\s*row;[^}]*flex-wrap:\s*nowrap;[^}]*overflow-x:\s*auto;/s,
+        'the shared popup stays in one horizontally scrollable row',
+    );
+    for (const label of ['Brush', 'Levels', 'Curves', 'Brightness/Contrast', 'Color mode']) {
+        assert.ok(findElement(panel, 'aria-label', label), `${label} should be in the combined popup`);
+    }
+    assert.deepEqual(
+        getToolIds(panel),
+        ['brush', 'levels', 'curves', 'brightness-contrast', 'color-mode'],
+    );
+    assert.equal(findElement(panel, 'aria-label', 'Crop'), null);
+
+    await click(findElement(panel, 'aria-label', 'Brush'));
+    await settleLayout();
+    assert.equal(launcher.props['aria-expanded'], false);
+    assert.equal(focusedTestElement, launcher, 'tool selection returns focus to the shared launcher');
+    assert.deepEqual(emitted, [{ name: 'select-tool', value: 'brush' }]);
+
+    await click(launcher);
+    const escapeHandler = panel.parent?.props.onKeydown;
+    assert.ok(typeof escapeHandler === 'function');
+    escapeHandler({
+        key: 'Escape',
+        stopPropagation() {},
+    } as KeyboardEvent);
+    await settleLayout();
+    assert.equal(launcher.props['aria-expanded'], false);
+    assert.equal(focusedTestElement, launcher, 'Escape restores focus to the shared launcher');
 
     await click(zoomIn);
     await click(zoomOut);
     assert.deepEqual(emitted, [
-        { name: 'select-tool', value: 'pan' },
+        { name: 'select-tool', value: 'brush' },
         { name: 'zoom-in' },
         { name: 'zoom-out' },
     ]);
@@ -292,21 +461,182 @@ test('collapsed rail keeps view tools outside the edit foldout and preserves too
         { activeTool: 'pan' },
     );
     context.after(() => panActive.app.unmount());
-    await nextTick();
-    const activeToggle = findElement(panActive.root, 'aria-label', 'More tools');
-    assert.ok(activeToggle);
-    assert.equal(activeToggle.props['aria-expanded'], false);
-    assert.doesNotMatch(String(activeToggle.props.class), /\bis-active\b/);
+    await settleLayout();
+    const activeLauncher = findMoreToolsLauncher(panActive.root);
+    assert.ok(activeLauncher);
+    assert.equal(activeLauncher.props['aria-expanded'], false);
+    assert.doesNotMatch(String(activeLauncher.props.class), /\bis-active\b/);
 });
 
-test('collapsed rail retains disabled states and expanded rail keeps tool groups', async (context) => {
+test('collapsing/restoring follows group order and the smallest rail can scroll', async (context) => {
     installBrowserMocks();
+    const adjustable = mountRail({
+        clientHeight: 510,
+        scrollHeight: 500,
+        scrollHeightsByCollapsedCount: [500, 300, 180, 120],
+    });
+    context.after(() => adjustable.app.unmount());
+    await settleLayout();
+
+    assert.equal(findMoreToolsLauncher(adjustable.root), null);
+    assertToolGroupRailOrder(adjustable.root, [
+        'Transform tools',
+        'divider',
+        'Paint tools',
+        'divider',
+        'Adjustment tools',
+    ]);
+
+    const rail = findElement(adjustable.root, 'tag', 'nav');
+    assert.ok(rail);
+    rail.clientHeight = 350;
+    triggerResizeObservers();
+    await settleLayout();
+    assertMoreToolsLauncher(adjustable.root);
+    assertToolGroupRailOrder(adjustable.root, [
+        'Transform tools',
+        'divider',
+        'Paint tools',
+        'divider',
+        'launcher',
+    ]);
+    const adjustmentPanel = findFoldoutPanel(adjustable.root, 'More tools');
+    assert.ok(adjustmentPanel);
+    assert.deepEqual(getPopupGroupLabels(adjustmentPanel), ['Adjustment tools']);
+
+    rail.clientHeight = 250;
+    triggerResizeObservers();
+    await settleLayout();
+    assertMoreToolsLauncher(adjustable.root);
+    assertToolGroupRailOrder(adjustable.root, ['Transform tools', 'divider', 'launcher']);
+    const paintAndAdjustmentPanel = findFoldoutPanel(adjustable.root, 'More tools');
+    assert.ok(paintAndAdjustmentPanel);
+    assert.deepEqual(getPopupGroupLabels(paintAndAdjustmentPanel), ['Paint tools', 'Adjustment tools']);
+
+    rail.clientHeight = 50;
+    triggerResizeObservers();
+    await settleLayout();
+    assertMoreToolsLauncher(adjustable.root);
+    assertToolGroupRailOrder(adjustable.root, ['launcher']);
+    const allToolsPanel = findFoldoutPanel(adjustable.root, 'More tools');
+    assert.ok(allToolsPanel);
+    assert.deepEqual(getPopupGroupLabels(allToolsPanel), [
+        'Transform tools',
+        'Paint tools',
+        'Adjustment tools',
+    ]);
+    assert.deepEqual(getToolIds(allToolsPanel), [
+        'crop',
+        'resize',
+        'rotate',
+        'brush',
+        'levels',
+        'curves',
+        'brightness-contrast',
+        'color-mode',
+    ]);
+    assert.equal(findElements(allToolsPanel, 'tag', 'hr').length, 2);
+
+    rail.clientHeight = 250;
+    triggerResizeObservers();
+    await settleLayout();
+    assertMoreToolsLauncher(adjustable.root);
+    assertToolGroupRailOrder(adjustable.root, ['Transform tools', 'divider', 'launcher']);
+    const restoredTransformPanel = findFoldoutPanel(adjustable.root, 'More tools');
+    assert.ok(restoredTransformPanel);
+    assert.deepEqual(getPopupGroupLabels(restoredTransformPanel), ['Paint tools', 'Adjustment tools']);
+
+    const inlineBrush = findElement(adjustable.root, 'aria-label', 'Brush');
+    assert.ok(inlineBrush);
+    inlineBrush.focus();
+    rail.clientHeight = 350;
+    triggerResizeObservers();
+    await settleLayout();
+    assertMoreToolsLauncher(adjustable.root);
+    assertToolGroupRailOrder(adjustable.root, [
+        'Transform tools',
+        'divider',
+        'Paint tools',
+        'divider',
+        'launcher',
+    ]);
+    const restoredPaintPanel = findFoldoutPanel(adjustable.root, 'More tools');
+    assert.ok(restoredPaintPanel);
+    assert.deepEqual(getPopupGroupLabels(restoredPaintPanel), ['Adjustment tools']);
+
+    rail.clientHeight = 250;
+    triggerResizeObservers();
+    await settleLayout();
+    assertToolGroupRailOrder(adjustable.root, ['Transform tools', 'divider', 'launcher']);
+    const collapsedLauncher = findMoreToolsLauncher(adjustable.root);
+    assert.ok(collapsedLauncher);
+    assert.equal(focusedTestElement, collapsedLauncher, 'a hidden inline tool hands focus to the shared launcher');
+
+    await click(collapsedLauncher);
+    const combinedPanel = findFoldoutPanel(adjustable.root, 'More tools');
+    assert.ok(combinedPanel);
+    findElement(combinedPanel, 'aria-label', 'Brush')?.focus();
+    rail.clientHeight = 310;
+    triggerResizeObservers();
+    await settleLayout();
+    assertToolGroupRailOrder(adjustable.root, [
+        'Transform tools',
+        'divider',
+        'Paint tools',
+        'divider',
+        'launcher',
+    ]);
+    const remainingPanel = findFoldoutPanel(adjustable.root, 'More tools');
+    assert.ok(remainingPanel);
+    assert.deepEqual(getPopupGroupLabels(remainingPanel), ['Adjustment tools']);
+    assert.equal(collapsedLauncher.props['aria-expanded'], false);
+    assert.equal(
+        focusedTestElement?.getAttribute('aria-label'),
+        'Brush',
+        'expanding an open group hands focus to its inline tool',
+    );
+
+    const tiny = mountRail({
+        clientHeight: 50,
+        scrollHeight: 500,
+        scrollHeightsByCollapsedCount: [500, 300, 180, 120],
+    });
+    context.after(() => tiny.app.unmount());
+    await settleLayout();
+    const tinyLauncher = findMoreToolsLauncher(tiny.root);
+    const transformPanel = findFoldoutPanel(tiny.root, 'More tools');
+    assert.ok(tinyLauncher && transformPanel);
+    assert.equal(transformPanel.style.display, 'none', 'collapsed content stays available in its launcher popup');
+    assert.deepEqual(getPopupGroupLabels(transformPanel), [
+        'Transform tools',
+        'Paint tools',
+        'Adjustment tools',
+    ]);
+    assertMoreToolsLauncher(tiny.root);
+    await click(tinyLauncher);
+    for (const label of ['Crop', 'Resize', 'Rotate image']) {
+        assert.ok(findElement(transformPanel, 'aria-label', label), `${label} should be in Transform tools`);
+    }
+    assert.deepEqual(getToolIds(transformPanel), [
+        'crop',
+        'resize',
+        'rotate',
+        'brush',
+        'levels',
+        'curves',
+        'brightness-contrast',
+        'color-mode',
+    ]);
+    for (const label of ['Levels', 'Brush']) {
+        assert.ok(findElement(transformPanel, 'aria-label', label), `${label} should be in the combined popup`);
+    }
+
     const empty = mountRail(
         { clientHeight: 100, scrollHeight: 500 },
         { hasImage: false, canZoomIn: false, canZoomOut: true },
     );
     context.after(() => empty.app.unmount());
-    await nextTick();
+    await settleLayout();
     assert.equal(findElement(empty.root, 'aria-label', 'Import image')?.props.disabled, false);
     assert.equal(findElement(empty.root, 'aria-label', 'Export')?.props.disabled, true);
     assert.equal(findElement(empty.root, 'aria-label', 'Undo')?.props.disabled, true);
@@ -321,7 +651,7 @@ test('collapsed rail retains disabled states and expanded rail keeps tool groups
         { busy: true, popupOpen: true },
     );
     context.after(() => busy.app.unmount());
-    await nextTick();
+    await settleLayout();
     assert.equal(findElement(busy.root, 'tag', 'fieldset')?.props.disabled, true);
     for (const label of ['Import image', 'Export', 'Undo', 'Redo', 'Crop', 'Pan']) {
         assert.equal(findElement(busy.root, 'aria-label', label)?.props.disabled, true);
@@ -331,25 +661,33 @@ test('collapsed rail retains disabled states and expanded rail keeps tool groups
 
     const expanded = mountRail({ clientHeight: 1000, scrollHeight: 500 });
     context.after(() => expanded.app.unmount());
-    await nextTick();
-    assert.equal(findElement(expanded.root, 'aria-label', 'More tools'), null);
+    await settleLayout();
+    assert.equal(findMoreToolsLauncher(expanded.root), null);
     const transformGroup = findElement(expanded.root, 'aria-label', 'Transform tools');
     const paintGroup = findElement(expanded.root, 'aria-label', 'Paint tools');
     const adjustmentGroup = findElement(expanded.root, 'aria-label', 'Adjustment tools');
     assert.ok(transformGroup && paintGroup && adjustmentGroup, 'all expanded tool groups should remain visible');
-    const groupChildren = adjustmentGroup.parent?.children ?? [];
-    const adjustmentGroupIndex = groupChildren.indexOf(adjustmentGroup);
+    const groupsContainer = findElement(expanded.root, 'class', 'tool-groups');
+    assert.ok(groupsContainer);
+    const groupRoots = groupsContainer.children.filter((child) => child.type === 'div');
+    assert.equal(groupRoots.length, 3, 'each semantic tool group keeps its own boundary');
+    const dividerGroupOrder = groupsContainer.children
+        .filter((child) => child.type === 'div' || child.type === 'hr')
+        .map((child) => child.type === 'hr' ? 'divider' : child.props['aria-label']);
+    assert.deepEqual(
+        dividerGroupOrder,
+        ['Transform tools', 'divider', 'Paint tools', 'divider', 'Adjustment tools'],
+        'the original Transform, Paint, Adjustment order remains separated by dividers',
+    );
+    const groupChildren = groupsContainer.parent?.children ?? [];
+    const groupsIndex = groupChildren.indexOf(groupsContainer);
     const nextGroupElement = groupChildren
-        .slice(adjustmentGroupIndex + 1)
+        .slice(groupsIndex + 1)
         .find((child) => child.type !== '#text' && child.type !== '#comment');
-    assert.equal(nextGroupElement?.type, 'hr', 'expanded editing groups should have a separator before View tools');
-    for (const label of ['Crop', 'Resize', 'Rotate image']) {
-        assert.ok(findElement(transformGroup, 'aria-label', label), `${label} should remain in the transform group`);
-    }
-    assert.ok(findElement(paintGroup, 'aria-label', 'Brush'), 'Brush should remain in the paint group');
-    for (const label of ['Levels', 'Curves', 'Brightness/Contrast', 'Color mode']) {
-        assert.ok(findElement(adjustmentGroup, 'aria-label', label), `${label} should remain in the adjustment group`);
-    }
+    assert.equal(nextGroupElement?.type, 'hr', 'editing groups should be separated from View tools');
+    assert.deepEqual(getToolIds(transformGroup), ['crop', 'resize', 'rotate']);
+    assert.deepEqual(getToolIds(paintGroup), ['brush']);
+    assert.deepEqual(getToolIds(adjustmentGroup), ['levels', 'curves', 'brightness-contrast', 'color-mode']);
 });
 
 for (const [platform, modifier] of [['MacIntel', '⌘'], ['Win32', 'Ctrl'], ['Linux x86_64', 'Ctrl']]) {
