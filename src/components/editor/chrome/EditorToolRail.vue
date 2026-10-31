@@ -19,6 +19,7 @@
 
     const props = defineProps<{
         activeTool: ToolId | null
+        eyedropperClosedFromToolbar: boolean
         hasImage: boolean
         busy: boolean
         popupOpen: boolean
@@ -108,6 +109,19 @@
                     : restoredGroups.at(-1);
                 if (group) void nextTick(() => focusTool(group, focusedTool));
             }
+        }
+    });
+
+    watch(() => props.activeTool, (tool, previousTool) => {
+        if (
+            previousTool === 'eyedropper'
+            && tool === null
+            && !props.eyedropperClosedFromToolbar
+            && groupIsCollapsed('paint')
+            && props.hasImage
+            && !props.busy
+        ) {
+            moreToolsOpen.value = true;
         }
     });
 

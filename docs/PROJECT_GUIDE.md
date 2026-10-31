@@ -18,6 +18,7 @@ how to open an image, use the editing tools, and download your result.
   - [Color mode](#color-mode)
 - [Paint with the brush](#paint-with-the-brush)
   - [Brush](#brush)
+- [Pick a color](#pick-a-color)
 - [Navigate the image](#navigate-the-image)
   - [Zoom and pan](#zoom-and-pan)
   - [Pixel rulers and motion](#pixel-rulers-and-motion)
@@ -131,6 +132,21 @@ The **Brush** tool lets you draw colored strokes directly on the image.
 Brush strokes are part of the image edit once applied and can then be undone
 with the editor's regular undo control.
 
+## Pick a color
+
+1. Select **Eyedropper** in the Paint tools group, immediately below Brush.
+2. Move over the preview to inspect a magnified pixel, then click to sample it.
+   The floating toolbar shows the color swatch and its selectable hex value.
+3. Select **Copy** to copy the displayed hex value. If copying is unavailable,
+   select the hex text and copy it manually.
+4. Sample another pixel to replace the current selection, or select **Close**
+   to leave the tool.
+
+The Eyedropper samples the current preview, including visible color
+adjustments, rotation, and flips. Fully opaque pixels are shown as `#RRGGBB`;
+pixels with transparency include alpha as `#RRGGBBAA`. Sampling does not change
+the image or add an edit to history.
+
 ## Adjust color and tone
 
 The adjustment buttons in the left toolbar open dialogs. Make changes while
@@ -207,6 +223,9 @@ Shortcuts that use the platform modifier mean **Ctrl** on Windows/Linux and
 | **Shift** while drawing or resizing a crop | Constrain the crop to a square |
 | Arrow keys on a focused crop handle | Resize the crop by one pixel |
 | **Shift** + arrow keys on a focused crop handle | Resize while keeping the crop square |
+| Arrow keys on the focused Eyedropper preview | Move the sampling point by one image pixel |
+| **Shift** + arrow keys on the focused Eyedropper preview | Move the sampling point by ten image pixels |
+| **Enter** or **Space** on the focused Eyedropper preview | Sample the current pixel |
 | **Enter** while Crop, Resize, or Rotate controls are focused | Apply the current edit |
 | **Escape** while an edit tool or dialog is active | Cancel the current preview or close the dialog |
 | Arrow keys on a toolbar or dialog grip | Move the toolbar or dialog |
@@ -254,10 +273,10 @@ you try to leave or replace an image with edits that have not been downloaded.
 
 ## Floating toolbars on narrow windows
 
-Crop, Resize, and Rotate toolbars stay on one line: their controls do not wrap
-into multiple rows. When the browser window is narrower than a toolbar, part
-of the toolbar can extend beyond the window edge. The dotted grip is kept
-within reach, but that does **not** mean every control remains visible.
+Crop, Resize, Rotate, and Eyedropper toolbars stay on one line: their controls
+do not wrap into multiple rows. When the browser window is narrower than a
+toolbar, part of the toolbar can extend beyond the window edge. The dotted grip
+is kept within reach, but that does **not** mean every control remains visible.
 
 Drag the grip to reposition the toolbar. You can also focus the grip and use
 the arrow keys; hold **Shift** for larger steps. Press **Home** or double-click

@@ -138,6 +138,7 @@ class TestElement {
 
 interface RailProps {
     activeTool?: string | null
+    eyedropperClosedFromToolbar?: boolean
     hasImage?: boolean
     busy?: boolean
     popupOpen?: boolean
@@ -199,6 +200,7 @@ function mountRail(railSize: RailSize, props: RailProps = {}) {
     });
     const app = renderer.createApp(editorToolRail, {
         activeTool: null,
+        eyedropperClosedFromToolbar: false,
         hasImage: true,
         busy: false,
         popupOpen: false,
@@ -368,6 +370,35 @@ async function settleLayout() {
     for (let index = 0; index < 8; index += 1) await nextTick();
 }
 
+test('closing eyedropper from its toolbar keeps collapsed Paint tools closed', async (context) => {
+    installBrowserMocks();
+    const railSize = {
+        clientHeight: 250,
+        scrollHeight: 500,
+        scrollHeightsByCollapsedCount: [500, 300, 180, 120],
+    };
+    const closedFromToolbar = mountRail(railSize);
+    context.after(() => closedFromToolbar.app.unmount());
+    await settleLayout();
+    closedFromToolbar.updateProps({ activeTool: 'eyedropper' });
+    await settleLayout();
+    closedFromToolbar.updateProps({
+        activeTool: null,
+        eyedropperClosedFromToolbar: true,
+    });
+    await settleLayout();
+    assert.equal(findMoreToolsLauncher(closedFromToolbar.root)?.props['aria-expanded'], false);
+
+    const closedAnotherWay = mountRail(railSize);
+    context.after(() => closedAnotherWay.app.unmount());
+    await settleLayout();
+    closedAnotherWay.updateProps({ activeTool: 'eyedropper' });
+    await settleLayout();
+    closedAnotherWay.updateProps({ activeTool: null });
+    await settleLayout();
+    assert.equal(findMoreToolsLauncher(closedAnotherWay.root)?.props['aria-expanded'], true);
+});
+
 test('one shared popup combines collapsed groups and preserves fixed tool actions', async (context) => {
     installBrowserMocks();
     const { app, emitted, root } = mountRail({
@@ -422,12 +453,12 @@ test('one shared popup combines collapsed groups and preserves fixed tool action
         /\.tool-foldout__panel\s*\{[^}]*flex-direction:\s*row;[^}]*flex-wrap:\s*nowrap;[^}]*overflow-x:\s*auto;/s,
         'the shared popup stays in one horizontally scrollable row',
     );
-    for (const label of ['Brush', 'Levels', 'Curves', 'Brightness/Contrast', 'Color mode']) {
+    for (const label of ['Brush', 'Eyedropper', 'Levels', 'Curves', 'Brightness/Contrast', 'Color mode']) {
         assert.ok(findElement(panel, 'aria-label', label), `${label} should be in the combined popup`);
     }
     assert.deepEqual(
         getToolIds(panel),
-        ['brush', 'levels', 'curves', 'brightness-contrast', 'color-mode'],
+        ['brush', 'eyedropper', 'levels', 'curves', 'brightness-contrast', 'color-mode'],
     );
     assert.equal(findElement(panel, 'aria-label', 'Crop'), null);
 
@@ -530,6 +561,7 @@ test('collapsing/restoring follows group order and the smallest rail can scroll'
         'resize',
         'rotate',
         'brush',
+        'eyedropper',
         'levels',
         'curves',
         'brightness-contrast',
@@ -622,12 +654,13 @@ test('collapsing/restoring follows group order and the smallest rail can scroll'
         'resize',
         'rotate',
         'brush',
+        'eyedropper',
         'levels',
         'curves',
         'brightness-contrast',
         'color-mode',
     ]);
-    for (const label of ['Levels', 'Brush']) {
+    for (const label of ['Levels', 'Brush', 'Eyedropper']) {
         assert.ok(findElement(transformPanel, 'aria-label', label), `${label} should be in the combined popup`);
     }
 
@@ -686,7 +719,7 @@ test('collapsing/restoring follows group order and the smallest rail can scroll'
         .find((child) => child.type !== '#text' && child.type !== '#comment');
     assert.equal(nextGroupElement?.type, 'hr', 'editing groups should be separated from View tools');
     assert.deepEqual(getToolIds(transformGroup), ['crop', 'resize', 'rotate']);
-    assert.deepEqual(getToolIds(paintGroup), ['brush']);
+    assert.deepEqual(getToolIds(paintGroup), ['brush', 'eyedropper']);
     assert.deepEqual(getToolIds(adjustmentGroup), ['levels', 'curves', 'brightness-contrast', 'color-mode']);
 });
 

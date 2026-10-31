@@ -59,6 +59,6 @@ test('invalid dimensions differ from the opening baseline', () => {
 });
 
 test('only FloatingToolbar tools participate', () => {
-    for (const tool of ['crop', 'resize', 'rotate', 'brush'] as const) assert.equal(isFloatingTool(tool), true);
+    for (const tool of ['crop', 'resize', 'rotate', 'brush', 'eyedropper'] as const) assert.equal(isFloatingTool(tool), true);
     for (const tool of ['levels', 'curves', 'brightness-contrast', 'color-mode', 'pan', null] as const) assert.equal(isFloatingTool(tool), false);
 });

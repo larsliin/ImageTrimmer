@@ -24,7 +24,7 @@ export function toolDraftKey(draft: ToolDraft): string {
 }
 
 export function isFloatingTool(tool: ToolId | null): boolean {
-    return tool === 'crop' || tool === 'resize' || tool === 'rotate' || tool === 'brush';
+    return tool === 'crop' || tool === 'resize' || tool === 'rotate' || tool === 'brush' || tool === 'eyedropper';
 }
 
 export type ToolCloseIntent = { kind: 'close' } | { kind: 'switch', tool: ToolId };

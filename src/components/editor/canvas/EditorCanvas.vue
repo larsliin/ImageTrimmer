@@ -11,6 +11,7 @@
     import { applyColorModeToPixels, type ColorMode } from '@/lib/colorMode';
     import { applyBrightnessContrastToPixels, type BrightnessContrastParams } from '@/lib/brightnessContrast';
     import { drawRotatedImage, rotatedSize, type QuarterTurns } from '@/lib/rotate';
+    import EyedropperTool from '../eyedropper/EyedropperTool.vue';
 
     const props = defineProps<{
         bitmap: ImageBitmap | null
@@ -19,6 +20,7 @@
         panEnabled: boolean
         navigationAnimationsEnabled: boolean
         cropEnabled: boolean
+        eyedropperEnabled: boolean
         busy: boolean
         loading: boolean
         error: string | null
@@ -40,6 +42,8 @@
         'cancel-crop': []
         'zoom-in': []
         'zoom-out': []
+        'exit-eyedropper': []
+        'close-eyedropper': []
     }>();
 
     const isDropActive = ref(false);
@@ -285,6 +289,13 @@
                     @apply="(crop, angle) => emit('crop', crop, angle)"
                     @cancel="emit('cancel-crop')"
                     @dirty="emit('crop-dirty', $event)"
+                />
+                <EyedropperTool
+                    v-if="eyedropperEnabled"
+                    :canvas="canvasRef"
+                    :disabled="busy"
+                    @exit="emit('exit-eyedropper')"
+                    @close="emit('close-eyedropper')"
                 />
             </div>
             <div v-else class="empty-state">

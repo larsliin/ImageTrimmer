@@ -69,12 +69,17 @@
     );
 
     const activeTool = ref<ToolId | null>(null);
+    const eyedropperClosedFromToolbar = shallowRef(false);
     const exportOpen = ref(false);
     const brush = useBrushTools({ activeTool, bitmap, isBusy, brushImage });
     const { settings: brushSettings, strokes: brushStrokes, hasPending: hasPendingBrush, drawing: brushDrawing } = brush;
     const guard = useToolCloseGuard({ activeTool, busy: isBusy, brushDirty: brush.dirty });
     const { pendingIntent, blocked: toolBlocked, toolName } = guard;
     const requestClose = () => guard.request({ kind: 'close' });
+    function closeEyedropperFromToolbar() {
+        eyedropperClosedFromToolbar.value = true;
+        requestClose();
+    }
     function afterFloatingToolClose(action: () => void) {
         if (isFloatingTool(activeTool.value)) guard.request({ kind: 'close' }, action);
         else action();
@@ -198,7 +203,8 @@
     const colorModePreview = ref<ColorMode | null>(null);
     const brightnessContrastPreview = ref<BrightnessContrastParams | null>(null);
 
-    watch(activeTool, () => {
+    watch(activeTool, (tool) => {
+        if (tool === 'eyedropper') eyedropperClosedFromToolbar.value = false;
         rotationPreview.value = 0;
         flipHPreview.value = false;
         flipVPreview.value = false;
@@ -289,6 +295,7 @@
         <EditorToolRail
             class="editor__tool-rail"
             :active-tool="activeTool"
+            :eyedropper-closed-from-toolbar="eyedropperClosedFromToolbar"
             :has-image="bitmap !== null"
             :busy="toolBlocked"
             :popup-open="popupOpen"
@@ -314,6 +321,7 @@
             :pan-enabled="activeTool === 'pan'"
             :navigation-animations-enabled="navigationAnimationsEnabled"
             :crop-enabled="activeTool === 'crop'"
+            :eyedropper-enabled="activeTool === 'eyedropper'"
             :busy="toolBlocked"
             :loading="status === 'loading'"
             :error="error"
@@ -332,6 +340,8 @@
             @crop="(crop, angle) => applyCrop(crop, angle)"
             @cancel-crop="requestClose"
             @crop-dirty="guard.reportDirty"
+            @exit-eyedropper="requestClose"
+            @close-eyedropper="closeEyedropperFromToolbar"
         >
             <template #overlay>
                 <ZoomControls
