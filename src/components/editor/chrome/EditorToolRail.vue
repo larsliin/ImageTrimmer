@@ -117,7 +117,7 @@
             previousTool === 'eyedropper'
             && tool === null
             && !props.eyedropperClosedFromToolbar
-            && groupIsCollapsed('paint')
+            && groupIsCollapsed('adjustment')
             && props.hasImage
             && !props.busy
         ) {

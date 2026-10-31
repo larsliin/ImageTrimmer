@@ -134,7 +134,7 @@ with the editor's regular undo control.
 
 ## Pick a color
 
-1. Select **Eyedropper** in the Paint tools group, immediately below Brush.
+1. Select **Eyedropper** in the Adjustment tools group, immediately after Color mode.
 2. Move over the preview to inspect a magnified pixel, then click to sample it.
    The floating toolbar shows the color swatch and its selectable hex value.
 3. Select **Copy** to copy the displayed hex value. If copying is unavailable,

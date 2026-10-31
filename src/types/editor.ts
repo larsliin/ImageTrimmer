@@ -23,7 +23,6 @@ export const TRANSFORM_TOOLS: readonly ToolDefinition[] = [
 
 export const PAINT_TOOLS: readonly ToolDefinition[] = [
     { id: 'brush', label: 'Brush', icon: 'bi-brush' },
-    { id: 'eyedropper', label: 'Eyedropper', icon: 'bi-eyedropper' },
 ];
 
 export const ADJUSTMENT_TOOLS: readonly ToolDefinition[] = [
@@ -31,6 +30,7 @@ export const ADJUSTMENT_TOOLS: readonly ToolDefinition[] = [
     { id: 'curves', label: 'Curves', icon: 'bi-bezier' },
     { id: 'brightness-contrast', label: 'Brightness/Contrast', icon: 'bi-sun' },
     { id: 'color-mode', label: 'Color mode', icon: 'bi-circle-half' },
+    { id: 'eyedropper', label: 'Eyedropper', icon: 'bi-eyedropper' },
 ];
 
 export const EDIT_TOOLS: readonly ToolDefinition[] = [...TRANSFORM_TOOLS, ...ADJUSTMENT_TOOLS];

@@ -370,7 +370,7 @@ async function settleLayout() {
     for (let index = 0; index < 8; index += 1) await nextTick();
 }
 
-test('closing eyedropper from its toolbar keeps collapsed Paint tools closed', async (context) => {
+test('closing eyedropper from its toolbar keeps collapsed Adjustment tools closed', async (context) => {
     installBrowserMocks();
     const railSize = {
         clientHeight: 250,
@@ -394,6 +394,21 @@ test('closing eyedropper from its toolbar keeps collapsed Paint tools closed', a
     await settleLayout();
     closedAnotherWay.updateProps({ activeTool: 'eyedropper' });
     await settleLayout();
+    const launcher = findMoreToolsLauncher(closedAnotherWay.root);
+    assert.ok(launcher);
+    await click(launcher);
+    const panel = findFoldoutPanel(closedAnotherWay.root, 'More tools');
+    assert.ok(panel);
+    assert.deepEqual(getPopupGroupLabels(panel), ['Paint tools', 'Adjustment tools']);
+    const eyedropper = findElement(panel, 'aria-label', 'Eyedropper');
+    assert.ok(eyedropper);
+    assert.equal(eyedropper.props['data-tool-group'], 'adjustment');
+    assert.equal(eyedropper.props['aria-pressed'], true);
+    assert.match(String(eyedropper.props.class), /\bis-active\b/);
+    assert.equal(findElements(eyedropper, 'tag', 'i')[0]?.props.class, 'bi bi-eyedropper');
+    await click(eyedropper);
+    assert.deepEqual(closedAnotherWay.emitted, [{ name: 'select-tool', value: 'eyedropper' }]);
+    assert.equal(focusedTestElement, launcher, 'selecting the collapsed tool returns focus to the launcher');
     closedAnotherWay.updateProps({ activeTool: null });
     await settleLayout();
     assert.equal(findMoreToolsLauncher(closedAnotherWay.root)?.props['aria-expanded'], true);
@@ -458,7 +473,7 @@ test('one shared popup combines collapsed groups and preserves fixed tool action
     }
     assert.deepEqual(
         getToolIds(panel),
-        ['brush', 'eyedropper', 'levels', 'curves', 'brightness-contrast', 'color-mode'],
+        ['brush', 'levels', 'curves', 'brightness-contrast', 'color-mode', 'eyedropper'],
     );
     assert.equal(findElement(panel, 'aria-label', 'Crop'), null);
 
@@ -561,11 +576,11 @@ test('collapsing/restoring follows group order and the smallest rail can scroll'
         'resize',
         'rotate',
         'brush',
-        'eyedropper',
         'levels',
         'curves',
         'brightness-contrast',
         'color-mode',
+        'eyedropper',
     ]);
     assert.equal(findElements(allToolsPanel, 'tag', 'hr').length, 2);
 
@@ -628,6 +643,35 @@ test('collapsing/restoring follows group order and the smallest rail can scroll'
         'expanding an open group hands focus to its inline tool',
     );
 
+    rail.clientHeight = 510;
+    triggerResizeObservers();
+    await settleLayout();
+    const inlineEyedropper = findElement(adjustable.root, 'aria-label', 'Eyedropper');
+    assert.ok(inlineEyedropper);
+    inlineEyedropper.focus();
+    rail.clientHeight = 350;
+    triggerResizeObservers();
+    await settleLayout();
+    const eyedropperLauncher = findMoreToolsLauncher(adjustable.root);
+    assert.ok(eyedropperLauncher);
+    assert.equal(
+        focusedTestElement,
+        eyedropperLauncher,
+        'collapsing Adjustment tools hands Eyedropper focus to the shared launcher',
+    );
+    await click(eyedropperLauncher);
+    const eyedropperPanel = findFoldoutPanel(adjustable.root, 'More tools');
+    assert.ok(eyedropperPanel);
+    findElement(eyedropperPanel, 'aria-label', 'Eyedropper')?.focus();
+    rail.clientHeight = 510;
+    triggerResizeObservers();
+    await settleLayout();
+    assert.equal(
+        focusedTestElement?.getAttribute('data-tool-id'),
+        'eyedropper',
+        'restoring Adjustment tools returns focus to Eyedropper',
+    );
+
     const tiny = mountRail({
         clientHeight: 50,
         scrollHeight: 500,
@@ -654,11 +698,11 @@ test('collapsing/restoring follows group order and the smallest rail can scroll'
         'resize',
         'rotate',
         'brush',
-        'eyedropper',
         'levels',
         'curves',
         'brightness-contrast',
         'color-mode',
+        'eyedropper',
     ]);
     for (const label of ['Levels', 'Brush', 'Eyedropper']) {
         assert.ok(findElement(transformPanel, 'aria-label', label), `${label} should be in the combined popup`);
@@ -719,8 +763,14 @@ test('collapsing/restoring follows group order and the smallest rail can scroll'
         .find((child) => child.type !== '#text' && child.type !== '#comment');
     assert.equal(nextGroupElement?.type, 'hr', 'editing groups should be separated from View tools');
     assert.deepEqual(getToolIds(transformGroup), ['crop', 'resize', 'rotate']);
-    assert.deepEqual(getToolIds(paintGroup), ['brush', 'eyedropper']);
-    assert.deepEqual(getToolIds(adjustmentGroup), ['levels', 'curves', 'brightness-contrast', 'color-mode']);
+    assert.deepEqual(getToolIds(paintGroup), ['brush']);
+    assert.deepEqual(getToolIds(adjustmentGroup), [
+        'levels',
+        'curves',
+        'brightness-contrast',
+        'color-mode',
+        'eyedropper',
+    ]);
 });
 
 for (const [platform, modifier] of [['MacIntel', '⌘'], ['Win32', 'Ctrl'], ['Linux x86_64', 'Ctrl']]) {
