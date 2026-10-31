@@ -1,10 +1,9 @@
 <script setup lang="ts">
     import { nextTick, shallowRef, useTemplateRef, watch } from 'vue';
     import {
-        ADJUSTMENT_TOOLS,
-        PAINT_TOOLS,
         PAN_TOOL,
-        TRANSFORM_TOOLS,
+        TOOL_GROUPS,
+        type ToolGroupId,
         type ToolId,
     } from '@/types/editor';
     import { useOverflowCollapse } from '@/composables/useOverflowCollapse';
@@ -39,27 +38,18 @@
         redo: []
     }>();
 
-    type ToolGroupId = 'adjustment' | 'paint' | 'transform';
-    const COLLAPSE_ORDER: readonly ToolGroupId[] = ['adjustment', 'paint', 'transform'];
-    const TOOLS_BY_GROUP = {
-        adjustment: ADJUSTMENT_TOOLS,
-        paint: PAINT_TOOLS,
-        transform: TRANSFORM_TOOLS,
-    } as const;
+    const COLLAPSE_ORDER: ToolGroupId[] = [...TOOL_GROUPS].reverse().map(({ id }) => id);
 
     const rail = useTemplateRef<HTMLElement>('rail');
-    const { collapsedCount } = useOverflowCollapse(rail);
+    const { collapsedCount } = useOverflowCollapse(rail, TOOL_GROUPS.length);
     const moreToolsOpen = shallowRef(false);
 
     function groupForTool(tool: string | null | undefined): ToolGroupId | null {
-        if (TOOLS_BY_GROUP.transform.some((item) => item.id === tool)) return 'transform';
-        if (TOOLS_BY_GROUP.paint.some((item) => item.id === tool)) return 'paint';
-        if (TOOLS_BY_GROUP.adjustment.some((item) => item.id === tool)) return 'adjustment';
-        return null;
+        return TOOL_GROUPS.find((group) => group.tools.some((item) => item.id === tool))?.id ?? null;
     }
 
     function isToolGroupId(value: string | null | undefined): value is ToolGroupId {
-        return value === 'adjustment' || value === 'paint' || value === 'transform';
+        return TOOL_GROUPS.some((group) => group.id === value);
     }
 
     function groupIsCollapsed(group: ToolGroupId) {
@@ -86,7 +76,7 @@
     function focusTool(group: ToolGroupId, tool: string | null | undefined) {
         const targetTool = groupForTool(tool) === group
             ? tool
-            : TOOLS_BY_GROUP[group][0]?.id ?? null;
+            : TOOL_GROUPS.find((toolGroup) => toolGroup.id === group)?.tools[0]?.id ?? null;
         if (targetTool) focusRailTarget(`[data-tool-id="${targetTool}"]`);
     }
 

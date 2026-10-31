@@ -1,9 +1,8 @@
 <script setup lang="ts">
     import { computed } from 'vue';
-    import { ADJUSTMENT_TOOLS, PAINT_TOOLS, TRANSFORM_TOOLS, type ToolId } from '@/types/editor';
-    import CurvesIcon from '@/components/editor/icons/CurvesIcon.vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { TOOL_GROUPS, type ToolId } from '@/types/editor';
     import EditorToolFoldout from './EditorToolFoldout.vue';
+    import EditorToolButton from './EditorToolButton.vue';
 
     const props = defineProps<{
         activeTool: ToolId | null
@@ -17,12 +16,6 @@
         'select-tool': [tool: ToolId]
         'update:moreToolsOpen': [open: boolean]
     }>();
-
-    const TOOL_GROUPS = [
-        { id: 'transform', label: 'Transform tools', tools: TRANSFORM_TOOLS },
-        { id: 'paint', label: 'Paint tools', tools: PAINT_TOOLS },
-        { id: 'adjustment', label: 'Adjustment tools', tools: ADJUSTMENT_TOOLS },
-    ] as const;
 
     const inlineGroups = computed(() => TOOL_GROUPS.filter((_, index) => !isCollapsed(index)));
     const collapsedGroups = computed(() => TOOL_GROUPS.filter((_, index) => isCollapsed(index)));
@@ -45,22 +38,15 @@
                 role="group"
                 :aria-label="group.label"
             >
-                <BaseButton
+                <EditorToolButton
                     v-for="tool in group.tools"
                     :key="tool.id"
-                    variant="tool"
-                    :class="{ 'is-active': activeTool === tool.id }"
-                    :aria-pressed="activeTool === tool.id"
-                    :aria-label="tool.label"
-                    :title="tool.label"
-                    :data-tool-id="tool.id"
-                    :data-tool-group="group.id"
+                    :tool="tool"
+                    :group-id="group.id"
+                    :active="activeTool === tool.id"
                     :disabled="!hasImage || busy"
-                    @click="emit('select-tool', tool.id)"
-                >
-                    <CurvesIcon v-if="tool.id === 'curves'" />
-                    <i v-else class="bi" :class="tool.icon" aria-hidden="true"></i>
-                </BaseButton>
+                    @select="emit('select-tool', $event)"
+                />
             </div>
         </template>
 
@@ -88,22 +74,15 @@
                         :aria-label="popupGroup.label"
                     >
                         <div class="tool-group tool-group--popup">
-                            <BaseButton
+                            <EditorToolButton
                                 v-for="tool in popupGroup.tools"
                                 :key="tool.id"
-                                variant="tool"
-                                :class="{ 'is-active': activeTool === tool.id }"
-                                :aria-pressed="activeTool === tool.id"
-                                :aria-label="tool.label"
-                                :title="tool.label"
-                                :data-tool-id="tool.id"
-                                :data-tool-group="popupGroup.id"
+                                :tool="tool"
+                                :group-id="popupGroup.id"
+                                :active="activeTool === tool.id"
                                 :disabled="!hasImage || busy"
-                                @click="emit('select-tool', tool.id)"
-                            >
-                                <CurvesIcon v-if="tool.id === 'curves'" />
-                                <i v-else class="bi" :class="tool.icon" aria-hidden="true"></i>
-                            </BaseButton>
+                                @select="emit('select-tool', $event)"
+                            />
                         </div>
                     </div>
                 </template>

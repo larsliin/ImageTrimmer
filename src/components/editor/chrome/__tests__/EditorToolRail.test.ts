@@ -3,7 +3,8 @@ import { Buffer } from 'node:buffer';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, extname, resolve } from 'node:path';
-import test, { type TestContext } from 'node:test';
+import { cwd } from 'node:process';
+import test from 'node:test';
 import { createRenderer, markRaw, nextTick, type Component } from 'vue';
 import { compileScript, compileTemplate, parse } from 'vue/compiler-sfc';
 import { ModuleKind, transpileModule } from 'typescript';
@@ -17,7 +18,7 @@ function replaceImport(source: string, specifier: string, replacement: string): 
 }
 
 function resolveAliasPath(specifier: string): string {
-    let path = resolve(process.cwd(), 'src', specifier.slice(2));
+    let path = resolve(cwd(), 'src', specifier.slice(2));
     if (!extname(path)) {
         if (existsSync(`${path}.ts`)) path += '.ts';
         else if (existsSync(`${path}.vue`)) path += '.vue';
@@ -243,7 +244,7 @@ function findElements(root: TestElement, property: string, value: string): TestE
 }
 
 async function readComponentStyles(path: string) {
-    const source = await readFile(resolve(process.cwd(), path), 'utf8');
+    const source = await readFile(resolve(cwd(), path), 'utf8');
     return parse(source, { filename: path }).descriptor.styles
         .map((style) => style.content)
         .join('\n');
@@ -336,15 +337,16 @@ async function click(element: TestElement | null) {
 function installBrowserMocks() {
     resizeObservers = new Set();
     focusedTestElement = null;
+    type TestResizeObserverCallback = () => void;
     class TestResizeObserver {
-        private readonly callback: ResizeObserverCallback;
+        private readonly callback: TestResizeObserverCallback;
         private readonly notify: () => void;
-        constructor(callback: ResizeObserverCallback) {
+        constructor(callback: TestResizeObserverCallback) {
             this.callback = callback;
-            this.notify = () => this.callback([], this as unknown as ResizeObserver);
+            this.notify = () => this.callback();
             resizeObservers.add(this.notify);
         }
-        observe() { this.callback([], this as unknown as ResizeObserver); }
+        observe() { this.callback(); }
         disconnect() { resizeObservers.delete(this.notify); }
     }
     Object.defineProperty(globalThis, 'ResizeObserver', { configurable: true, value: TestResizeObserver });

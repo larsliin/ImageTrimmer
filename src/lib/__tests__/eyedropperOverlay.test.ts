@@ -38,7 +38,6 @@ interface OverlayState extends ComponentPublicInstance {
     // eslint-disable-next-line no-unused-vars
     onKeydown(event: KeyboardEvent): void
     // eslint-disable-next-line no-unused-vars
-    // eslint-disable-next-line no-unused-vars
     sampleAtPointer(event: MouseEvent): void
 }
 

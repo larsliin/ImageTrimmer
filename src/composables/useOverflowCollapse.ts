@@ -5,9 +5,11 @@ import { nextTick, onBeforeUnmount, onMounted, shallowRef, type Ref } from 'vue'
  * them in reverse as the container grows. The final state is allowed to scroll if it still
  * cannot fit.
  */
-export function useOverflowCollapse(container: Readonly<Ref<HTMLElement | null>>) {
+export function useOverflowCollapse(
+    container: Readonly<Ref<HTMLElement | null>>,
+    maxCollapsedCount: number,
+) {
     const collapsedCount = shallowRef(0);
-    const maxCollapsedCount = 3;
     let observer: ResizeObserver | null = null;
     let updating = false;
     let updateRequested = false;
@@ -61,5 +63,5 @@ export function useOverflowCollapse(container: Readonly<Ref<HTMLElement | null>>
 
     onBeforeUnmount(() => observer?.disconnect());
 
-    return { collapsedCount, update };
+    return { collapsedCount };
 }

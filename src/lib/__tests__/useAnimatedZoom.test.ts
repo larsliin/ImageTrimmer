@@ -123,15 +123,12 @@ test('animated zoom: canZoomIn/Out check target zoom, not animated zoom', async 
 
     // Initially at 100%, can zoom in
     assert.equal(zoomState.canZoomIn.value, true);
-    
-    // Get what the next zoom would be
-    const nextZoomLevel = zoomState.targetZoom.value * 1.5; // approximate next level
-    
+
     // Verify that targetZoom is used for canZoomIn checks
     // by checking initial state
     assert(zoomState.targetZoom.value === zoomState.zoom.value);
     assert.equal(zoomState.canZoomIn.value, true);
-    
+
     scope.stop();
 });
 
@@ -145,18 +142,18 @@ test('animated zoom: targetZoom used for next step calculation', async () => {
 
     const initialZoom = zoomState.zoom.value;
     const initialTarget = zoomState.targetZoom.value;
-    
+
     // Verify initially they're the same
     assert.equal(initialZoom, initialTarget);
-    
+
     // Manually set a zoom using setZoom (which bypasses animation)
     zoomState.setZoom(0.5);
     assert.equal(zoomState.zoom.value, 0.5);
     assert.equal(zoomState.targetZoom.value, 0.5);
-    
+
     // Both should update together when not animating
     assert.equal(zoomState.zoom.value, zoomState.targetZoom.value);
-    
+
     scope.stop();
 });
 
@@ -186,7 +183,7 @@ test('animated zoom: disabled navigation animations apply zoom, Fit, and Actual 
     scope.stop();
 });
 
-type TestAnimationFrame = (timestamp: number) => void;
+type TestAnimationFrame = () => void;
 
 test('animated zoom: disabling during an animation completes at its requested target', (t) => {
     const pendingFrames = new Map<number, TestAnimationFrame>();

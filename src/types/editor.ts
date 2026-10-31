@@ -33,6 +33,14 @@ export const ADJUSTMENT_TOOLS: readonly ToolDefinition[] = [
     { id: 'eyedropper', label: 'Eyedropper', icon: 'bi-eyedropper' },
 ];
 
+export const TOOL_GROUPS = [
+    { id: 'transform', label: 'Transform tools', tools: TRANSFORM_TOOLS },
+    { id: 'paint', label: 'Paint tools', tools: PAINT_TOOLS },
+    { id: 'adjustment', label: 'Adjustment tools', tools: ADJUSTMENT_TOOLS },
+] as const;
+
+export type ToolGroupId = typeof TOOL_GROUPS[number]['id'];
+
 export const EDIT_TOOLS: readonly ToolDefinition[] = [...TRANSFORM_TOOLS, ...ADJUSTMENT_TOOLS];
 
 export const PAN_TOOL: ToolDefinition = { id: 'pan', label: 'Pan', icon: 'bi-arrows-move' };
