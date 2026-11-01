@@ -45,7 +45,8 @@ there are unapplied edits prompts you to keep editing or discard those edits.
 ## Understanding the editor
 
 - **Top bar:** Shows the current filename and provides pixel-ruler, animation,
-  theme, and close-image controls. Select the filename to rename it.
+  theme, and close-image controls. Select the filename, extension, or pen icon
+  to rename it.
 - **Left toolbar:** Contains image import and export, undo and redo, editing
   tools, and zoom controls. On a short window, some tools may be grouped under
   **More tools**.
@@ -251,9 +252,10 @@ imported image, so use Undo to step back through applied changes.
 
 ## Rename and export
 
-Select the filename in the top bar to edit it. Press **Enter** or click away
-to save the name, or press **Escape** to cancel. The extension is chosen by
-the export format; renaming changes the download name, not the source file.
+Select the filename, its extension, or the pen icon in the top bar to edit the
+name. Only the filename can be changed; the extension is chosen by the export
+format. Press **Enter** or click away to save, or press **Escape** to cancel.
+Renaming changes the download name, not the source file.
 
 1. Select **Export** in the left toolbar.
 2. Choose **PNG**, **JPEG**, or **WebP**. For JPEG and WebP, optionally choose

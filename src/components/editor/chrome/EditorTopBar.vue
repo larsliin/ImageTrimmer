@@ -22,6 +22,8 @@
 
     const isEditing = shallowRef(false);
     const draftName = shallowRef('');
+    const suppressFilenameFocusRing = shallowRef(false);
+    const filenameAction = useTemplateRef<HTMLButtonElement>('filenameAction');
     const filenameInput = useTemplateRef<HTMLInputElement>('filenameInput');
 
     const fileName = computed(() => props.image?.fileName ?? 'No image');
@@ -39,7 +41,8 @@
         set: (value: string) => { draftName.value = value; },
     });
     async function startRenaming() {
-        if (!props.image || props.busy) return;
+        if (!props.image || props.busy || isEditing.value) return;
+        suppressFilenameFocusRing.value = false;
         draftName.value = fileNameBase.value;
         isEditing.value = true;
         await nextTick();
@@ -47,7 +50,11 @@
         filenameInput.value?.setSelectionRange(0, draftName.value.length);
     }
 
-    async function finishRenaming(cancel = false, restoreFocus = false) {
+    async function finishRenaming(
+        cancel = false,
+        restoreFocus = false,
+        suppressFocusRing = false,
+    ) {
         if (!isEditing.value) return;
         if (!cancel) {
             const input = filenameInput.value;
@@ -58,8 +65,9 @@
         }
         isEditing.value = false;
         if (restoreFocus) {
+            suppressFilenameFocusRing.value = suppressFocusRing;
             await nextTick();
-            filenameInput.value?.focus();
+            filenameAction.value?.focus();
         }
     }
 
@@ -76,30 +84,57 @@
                     <i class="document-detail__icon bi bi-file-earmark-image" aria-hidden="true"></i>
                 </dt>
                 <dd class="filename-controls" :class="{ 'filename-controls--editing': isEditing }">
-                    <div class="filename-field">
-                        <div class="filename-base">
-                            <input
-                                ref="filenameInput"
-                                v-model="displayedName"
-                                class="filename-input"
-                                type="text"
-                                aria-label="Filename"
-                                required
-                                :readonly="!isEditing"
-                                :tabindex="image ? 0 : -1"
-                                :title="fileName"
-                                :disabled="busy || !image"
-                                :class="{ 'filename-input--empty': !image }"
-                                @input="filenameInput?.setCustomValidity('')"
-                                @blur="finishRenaming()"
-                                @click="!isEditing && startRenaming()"
-                                @keydown.enter.prevent="isEditing ? finishRenaming(false, true) : startRenaming()"
-                                @keydown.esc.prevent="finishRenaming(true, true)"
-                            />
+                    <button
+                        v-if="!isEditing"
+                        ref="filenameAction"
+                        class="filename-control filename-control--action"
+                        type="button"
+                        :aria-label="`Rename ${fileName}`"
+                        :title="fileName"
+                        :disabled="busy || !image"
+                        :class="{ 'filename-control--programmatic-return': suppressFilenameFocusRing }"
+                        @click="startRenaming"
+                        @keydown.space.prevent="startRenaming"
+                        @blur="suppressFilenameFocusRing = false"
+                    >
+                        <span class="filename-field">
+                            <span class="filename-base">
+                                <span class="filename-base-text">{{ fileNameBase }}</span>
+                            </span>
+                            <span v-if="fileExtension" class="filename-extension">{{ fileExtension }}</span>
+                        </span>
+                        <i
+                            v-if="image"
+                            class="filename-edit-indicator bi bi-pencil"
+                            aria-hidden="true"
+                        ></i>
+                    </button>
+                    <div v-else class="filename-control">
+                        <div class="filename-field">
+                            <div class="filename-base">
+                                <input
+                                    ref="filenameInput"
+                                    v-model="displayedName"
+                                    class="filename-input"
+                                    type="text"
+                                    aria-label="Filename"
+                                    required
+                                    :title="fileName"
+                                    :disabled="busy || !image"
+                                    @input="filenameInput?.setCustomValidity('')"
+                                    @blur="finishRenaming()"
+                                    @keydown.enter.prevent="finishRenaming(false, true, true)"
+                                    @keydown.esc.prevent="finishRenaming(true, true)"
+                                />
+                            </div>
+                            <span v-if="fileExtension" class="filename-extension">{{ fileExtension }}</span>
                         </div>
-                        <span v-if="fileExtension" class="filename-extension">{{ fileExtension }}</span>
+                        <i
+                            v-if="image"
+                            class="filename-edit-indicator bi bi-pencil"
+                            aria-hidden="true"
+                        ></i>
                     </div>
-                    <i v-if="image" class="filename-edit-indicator bi bi-pencil" aria-hidden="true"></i>
                 </dd>
             </div>
         </dl>
@@ -369,18 +404,36 @@
 .filename-controls {
     display: flex;
     align-items: center;
-    gap: 5px;
     flex: 0 1 auto;
     min-width: 0;
 }
 
-.filename-field {
+.filename-control {
+    outline-offset: 1px;
     display: flex;
     align-items: center;
+    min-width: 0;
+    height: 28px;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    color: var(--color-text);
+    background-color: transparent;
+    font: inherit;
+    text-align: left;
+}
+
+.filename-field {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
     height: 28px;
     padding: 0 3px;
     border: 1px solid transparent;
     border-radius: 5px;
+    background-color: transparent;
     font-size: 0.8125rem;
     font-weight: 500;
     line-height: 18px;
@@ -388,24 +441,46 @@
     transition: background-color 120ms ease, border-color 120ms ease;
 }
 
-.filename-field:has(.filename-input:not(:disabled)):hover,
+.filename-control--action:not(:disabled):hover .filename-field,
 .filename-controls--editing .filename-field {
     border-color: var(--color-border);
     background-color: var(--color-panel-raised);
 }
 
+.filename-control--action:focus-visible:not(.filename-control--programmatic-return) .filename-field,
 .filename-field:has(.filename-input:focus-visible) {
     outline: 2px solid var(--color-focus);
     outline-offset: 1px;
 }
 
+.filename-control--action:disabled {
+    color: var(--color-text-muted);
+    cursor: default;
+}
+
+.filename-control--action {
+    appearance: none;
+    cursor: pointer;
+}
+
 .filename-base {
     display: flex;
+    flex: 1 1 auto;
     min-width: 0;
+}
+
+.filename-base-text {
+    display: block;
+    min-width: .5rem;
+    max-width: min(18rem, 40vw);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .filename-input {
     field-sizing: content;
+    flex: 1 1 auto;
     width: auto;
     min-width: .5rem;
     max-width: min(18rem, 40vw);
@@ -418,25 +493,18 @@
     background-color: transparent;
 }
 
-.filename-input:read-only {
-    text-overflow: ellipsis;
-    cursor: pointer;
-}
-
 .filename-input:disabled {
     cursor: default;
     color: var(--color-text-muted);
 }
 
-.filename-input--empty {
-    transform: translateY(1px);
-}
-
 .filename-edit-indicator {
-    flex: 0 0 auto;
+    flex: 0 0 14px;
+    width: 14px;
     color: var(--color-text-muted);
     font-size: 10px;
     opacity: 0.55;
+    text-align: center;
     transition: color 120ms ease, opacity 120ms ease;
 }
 
@@ -448,6 +516,7 @@
 
 .filename-extension {
     flex: 0 0 auto;
+    margin-inline-start: -6px;
     color: var(--color-text-muted);
 }
 
