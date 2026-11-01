@@ -101,7 +101,7 @@
             :disabled="disabled || isActualSize"
             @click="emit('actual-size')"
         >
-            <i class="bi bi-1-square" aria-hidden="true"></i>
+            <span class="zoom-actual-size-icon" aria-hidden="true">1:1</span>
         </BaseButton>
         <output
             v-if="imageSize"
@@ -223,5 +223,17 @@
 .zoom-button:disabled {
     opacity: 0.4;
     cursor: default;
+}
+
+.zoom-actual-size-icon {
+    display: grid;
+    place-items: center;
+    box-sizing: border-box;
+    width: 14px;
+    height: 14px;
+    border: 1px solid currentColor;
+    color: inherit;
+    font-size: 7px;
+    line-height: 1;
 }
 </style>
