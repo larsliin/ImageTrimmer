@@ -440,8 +440,11 @@ test('preserves the standard focus-visible ring outside the programmatic return'
     assert.equal(hasClass(renameButton, 'filename-control--programmatic-return'), false);
     assert.match(
         source,
-        /\.filename-control--action:focus-visible:not\(\.filename-control--programmatic-return\) \.filename-field,/,
+        /\.filename-control--action:focus-visible:not\(\.filename-control--programmatic-return\) \.filename-field\s*\{/,
     );
+    assert.match(source, /\.filename-control--action\s*\{[^}]*outline:\s*none\s*;/);
+    assert.doesNotMatch(source, /\.filename-field:has\(\.filename-input:focus-visible\)/);
+    assert.match(source, /outline:\s*2px solid var\(--color-focus\)/);
 });
 
 test('cancels renaming without validation or emitting and restores button focus', async (t) => {
@@ -462,8 +465,11 @@ test('cancels renaming without validation or emitting and restores button focus'
     assert.equal(filenameInput.value, 'original');
     assert.equal(filenameInput.focusCount, 1);
     assert.equal(returnedButton.focusCount, 1);
-    assert.equal(hasClass(returnedButton, 'filename-control--programmatic-return'), false);
+    assert.equal(hasClass(returnedButton, 'filename-control--programmatic-return'), true);
     assert.deepEqual(emitted, []);
+
+    await invokeHandler(returnedButton, 'onBlur', new Event('blur'));
+    assert.equal(hasClass(returnedButton, 'filename-control--programmatic-return'), false);
 });
 
 test('shows the full filename including extension when not editing', (t) => {

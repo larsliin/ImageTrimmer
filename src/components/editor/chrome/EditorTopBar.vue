@@ -50,11 +50,7 @@
         filenameInput.value?.setSelectionRange(0, draftName.value.length);
     }
 
-    async function finishRenaming(
-        cancel = false,
-        restoreFocus = false,
-        suppressFocusRing = false,
-    ) {
+    async function finishRenaming(cancel = false, restoreFocus = false) {
         if (!isEditing.value) return;
         if (!cancel) {
             const input = filenameInput.value;
@@ -65,7 +61,7 @@
         }
         isEditing.value = false;
         if (restoreFocus) {
-            suppressFilenameFocusRing.value = suppressFocusRing;
+            suppressFilenameFocusRing.value = true;
             await nextTick();
             filenameAction.value?.focus();
         }
@@ -123,7 +119,7 @@
                                     :disabled="busy || !image"
                                     @input="filenameInput?.setCustomValidity('')"
                                     @blur="finishRenaming()"
-                                    @keydown.enter.prevent="finishRenaming(false, true, true)"
+                                    @keydown.enter.prevent="finishRenaming(false, true)"
                                     @keydown.esc.prevent="finishRenaming(true, true)"
                                 />
                             </div>
@@ -447,8 +443,7 @@
     background-color: var(--color-panel-raised);
 }
 
-.filename-control--action:focus-visible:not(.filename-control--programmatic-return) .filename-field,
-.filename-field:has(.filename-input:focus-visible) {
+.filename-control--action:focus-visible:not(.filename-control--programmatic-return) .filename-field {
     outline: 2px solid var(--color-focus);
     outline-offset: 1px;
 }
@@ -461,6 +456,7 @@
 .filename-control--action {
     appearance: none;
     cursor: pointer;
+    outline: none;
 }
 
 .filename-base {
@@ -501,17 +497,10 @@
 .filename-edit-indicator {
     flex: 0 0 14px;
     width: 14px;
-    color: var(--color-text-muted);
+    color: var(--color-text);
     font-size: 10px;
-    opacity: 0.55;
     text-align: center;
     transition: color 120ms ease, opacity 120ms ease;
-}
-
-.filename-controls:hover .filename-edit-indicator,
-.filename-controls:focus-within .filename-edit-indicator {
-    color: var(--color-text);
-    opacity: 1;
 }
 
 .filename-extension {
