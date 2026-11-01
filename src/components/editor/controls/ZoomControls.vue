@@ -232,6 +232,7 @@
     width: 14px;
     height: 14px;
     border: 1px solid currentColor;
+    border-radius: 4px;
     color: inherit;
     font-size: 7px;
     line-height: 1;
