@@ -270,6 +270,10 @@
     font-weight: 600;
 }
 
+.dropdown-select__option--selected:hover {
+    filter: brightness(1.08);
+}
+
 .dropdown-select__option--selected .dropdown-select__option-content i {
     color: #fff;
 }
