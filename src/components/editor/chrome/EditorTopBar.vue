@@ -2,11 +2,14 @@
     import { computed, nextTick, shallowRef, useTemplateRef } from 'vue';
     import type { ImageInfo } from '@/types/editor';
     import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import DropdownSelect, { type DropdownOption } from '@/components/shared/DropdownSelect.vue';
+    import type { ThemeMode } from '@/lib/theme';
 
     const props = defineProps<{
         image: ImageInfo | null
         busy: boolean
         isDarkMode: boolean
+        themeMode: ThemeMode
         rulersEnabled: boolean
         navigationAnimationsEnabled: boolean
         prefersReducedMotion: boolean
@@ -14,7 +17,7 @@
 
     const emit = defineEmits<{
         rename: [fileName: string]
-        'toggle-theme': []
+        'select-theme': [mode: ThemeMode]
         'toggle-rulers': []
         'toggle-navigation-animations': []
         close: []
@@ -25,6 +28,15 @@
     const suppressFilenameFocusRing = shallowRef(false);
     const filenameAction = useTemplateRef<HTMLButtonElement>('filenameAction');
     const filenameInput = useTemplateRef<HTMLInputElement>('filenameInput');
+    const themeOptions: DropdownOption[] = [
+        { value: 'light', label: 'Light mode' },
+        { value: 'dark', label: 'Dark mode' },
+        { value: 'auto', label: 'Auto' },
+    ];
+
+    function selectTheme(value: string) {
+        if (value === 'light' || value === 'dark' || value === 'auto') emit('select-theme', value);
+    }
 
     const fileName = computed(() => props.image?.fileName ?? 'No image');
     const fileNameBase = computed(() => {
@@ -159,15 +171,15 @@
             >
                 <i class="bi bi-wind" aria-hidden="true"></i>
             </BaseButton>
-            <BaseButton
-                class="theme-toggle"
-                :aria-label="isDarkMode ? 'Dark mode' : 'Light mode'"
-                :aria-pressed="isDarkMode"
-                :title="isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'"
-                @click="emit('toggle-theme')"
+            <DropdownSelect
+                class="theme-picker"
+                label="Theme"
+                :model-value="themeMode"
+                :options="themeOptions"
+                @select="selectTheme"
             >
                 <i :class="isDarkMode ? 'bi bi-moon' : 'bi bi-sun'" aria-hidden="true"></i>
-            </BaseButton>
+            </DropdownSelect>
         </div>
         <BaseButton
             class="close-button"
@@ -217,7 +229,6 @@
     margin-left: 14px;
 }
 
-.theme-toggle,
 .rulers-toggle,
 .navigation-animation-toggle {
     display: grid;
@@ -250,14 +261,12 @@
     cursor: default;
 }
 
-.theme-toggle:hover,
 .rulers-toggle:hover:not(:disabled),
 .navigation-animation-toggle:hover:not(:disabled) {
     color: var(--color-text);
     background-color: var(--color-hover);
 }
 
-.theme-toggle:focus-visible,
 .rulers-toggle:focus-visible,
 .navigation-animation-toggle:focus-visible {
     outline: 1px solid var(--color-focus);
@@ -278,7 +287,6 @@
 }
 
 .controls-group .rulers-toggle,
-.controls-group .theme-toggle,
 .controls-group .navigation-animation-toggle {
     display: grid;
     place-items: center;
@@ -291,14 +299,12 @@
     border-radius: 4px;
 }
 
-.controls-group .theme-toggle:hover:not(:disabled),
 .controls-group .rulers-toggle:hover:not(:disabled),
 .controls-group .navigation-animation-toggle:hover:not(:disabled) {
     color: var(--color-text);
     background-color: var(--color-hover);
 }
 
-.controls-group .theme-toggle:focus-visible,
 .controls-group .rulers-toggle:focus-visible,
 .controls-group .navigation-animation-toggle:focus-visible {
     outline: 1px solid var(--color-focus);
@@ -306,23 +312,36 @@
 }
 
 .controls-group .rulers-toggle[aria-pressed='true']:not(:disabled),
-.controls-group .theme-toggle[aria-pressed='true']:not(:disabled),
 .controls-group .navigation-animation-toggle[aria-pressed='true']:not(:disabled) {
     color: var(--color-text);
     background-color: var(--color-active);
 }
 
 .controls-group .rulers-toggle:active:not(:disabled),
-.controls-group .theme-toggle:active:not(:disabled),
 .controls-group .navigation-animation-toggle:active:not(:disabled) {
     box-shadow: inset 0 0 0 1px var(--color-border);
 }
 
 .controls-group .rulers-toggle:disabled,
-.controls-group .theme-toggle:disabled,
 .controls-group .navigation-animation-toggle:disabled {
     opacity: var(--opacity-button-secondary-disabled);
     cursor: default;
+}
+
+.controls-group :deep(.dropdown-select__trigger) {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+}
+
+.controls-group :deep(.dropdown-select__trigger:focus-visible) {
+    outline: 1px solid var(--color-focus);
+    outline-offset: -3px;
 }
 
 .close-button {

@@ -6,6 +6,7 @@ import { createRenderer, markRaw, type Component } from 'vue';
 import { compileScript, parse } from 'vue/compiler-sfc';
 import { transpileModule, ModuleKind } from 'typescript';
 import type { ImageInfo } from '@/types/editor';
+import type { ThemeMode } from '@/lib/theme';
 import { baseControlUrl } from '../../../bascomponents/__tests__/loadBaseControl.ts';
 
 // This parameter is part of the callback type and is intentionally not referenced here.
@@ -42,6 +43,20 @@ class TestElement {
         return new TestDocument();
     }
 
+    getBoundingClientRect() {
+        return { top: 10, right: 40, bottom: 40, left: 10, width: 30, height: 30 };
+    }
+
+    querySelectorAll(selector: string) {
+        const matches: TestElement[] = [];
+        const visit = (element: TestElement) => {
+            if (selector === '[role="radio"]' && element.props.role === 'radio') matches.push(element);
+            for (const child of element.children) visit(child);
+        };
+        for (const child of this.children) visit(child);
+        return matches;
+    }
+
     addEventListener(type: string, listener: TestEventListener) {
         const listeners = this.eventListeners.get(type) ?? [];
         listeners.push(listener);
@@ -73,10 +88,22 @@ Object.defineProperty(globalThis, 'HTMLSelectElement', {
 });
 
 const source = await readFile(new URL('../EditorTopBar.vue', import.meta.url), 'utf8');
+const dropdownSource = await readFile(new URL('../../../shared/DropdownSelect.vue', import.meta.url), 'utf8');
+const dropdownScript = compileScript(parse(dropdownSource).descriptor, {
+    id: 'dropdown-select-test',
+    inlineTemplate: true,
+}).content;
+const dropdownCompiled = transpileModule(dropdownScript, {
+    compilerOptions: { module: ModuleKind.ESNext },
+}).outputText
+    .replaceAll("'vue'", JSON.stringify(import.meta.resolve('vue')))
+    .replaceAll('"vue"', JSON.stringify(import.meta.resolve('vue')));
+const dropdownUrl = `data:text/javascript;base64,${Buffer.from(dropdownCompiled).toString('base64')}`;
 const { descriptor } = parse(source);
 const script = compileScript(descriptor, { id: 'editor-top-bar-test', inlineTemplate: true }).content;
 const compiled = transpileModule(script, { compilerOptions: { module: ModuleKind.ESNext } }).outputText
     .replaceAll("'@/components/bascomponents/BaseButton.vue'", JSON.stringify(await baseControlUrl('BaseButton')))
+    .replaceAll("'@/components/shared/DropdownSelect.vue'", JSON.stringify(dropdownUrl))
     .replaceAll("'vue'", JSON.stringify(import.meta.resolve('vue')))
     .replaceAll('"vue"', JSON.stringify(import.meta.resolve('vue')));
 const { default: editorTopBar }: { default: Component } = await import(
@@ -137,6 +164,7 @@ function mountTopBar(
     navigationAnimationsEnabled = true,
     prefersReducedMotion = false,
     isDarkMode = false,
+    themeMode: ThemeMode = isDarkMode ? 'dark' : 'light',
 ) {
     const emitted: EmittedEvent[] = [];
     const app = renderer.createApp(
@@ -145,11 +173,12 @@ function mountTopBar(
             image,
             busy,
             isDarkMode,
+            themeMode,
             rulersEnabled,
             navigationAnimationsEnabled,
             prefersReducedMotion,
             onRename: (value: string) => emitted.push({ name: 'rename', value }),
-            onToggleTheme: () => emitted.push({ name: 'toggle-theme' }),
+            onSelectTheme: (value: ThemeMode) => emitted.push({ name: 'select-theme', value }),
             onToggleRulers: () => emitted.push({ name: 'toggle-rulers' }),
             onToggleNavigationAnimations: () => emitted.push({ name: 'toggle-navigation-animations' }),
         },
@@ -486,24 +515,49 @@ test('shows the full filename including extension when not editing', (t) => {
     assert.equal(findElement(root, 'class', 'filename-extension')?.text, '.png');
 });
 
-test('emits the theme toggle event when its button is activated', async (t) => {
+test('opens the theme picker and selects Light, Dark, or Auto mode', async (t) => {
     const { emitted, root } = mountTopBar(t, null);
-    const themeButton = findElement(root, 'class', 'theme-toggle');
+    const themeButton = findElement(root, 'aria-label', 'Theme: Light mode');
     assert.ok(themeButton);
-    assert.equal(themeButton.props['aria-label'], 'Light mode');
-    assert.equal(themeButton.props['aria-pressed'], false);
-    assert.equal(themeButton.props.title, 'Switch to dark mode');
+    assert.equal(themeButton.props['aria-expanded'], false);
     assert.ok(findElement(themeButton, 'class', 'bi bi-sun'));
 
     await invokeHandler(themeButton, 'onClick', new Event('click'));
 
-    assert.deepEqual(emitted, [{ name: 'toggle-theme' }]);
+    assert.equal(themeButton.props['aria-expanded'], true);
+    assert.equal(findElement(root, 'role', 'radiogroup')?.props['aria-label'], 'Theme');
+    assert.equal(findElement(root, 'aria-label', 'Light mode')?.props['aria-checked'], true);
+    assert.equal(findElement(root, 'aria-label', 'Dark mode')?.props['aria-checked'], false);
+    assert.equal(findElement(root, 'aria-label', 'Auto')?.props['aria-checked'], false);
 
-    const darkMode = mountTopBar(t, null, false, false, true, false, true);
-    const darkThemeButton = findElement(darkMode.root, 'class', 'theme-toggle');
+    const lightOption = findElement(root, 'aria-label', 'Light mode');
+    assert.ok(lightOption);
+    await invokeHandler(lightOption, 'onKeydown', keyboardEvent('ArrowDown'));
+    assert.deepEqual(emitted, [{ name: 'select-theme', value: 'dark' }]);
+    assert.equal(themeButton.props['aria-expanded'], true);
+
+    assert.ok(themeButton.parent);
+    await invokeHandler(themeButton.parent, 'onKeydown', keyboardEvent('Escape'));
+    assert.equal(themeButton.props['aria-expanded'], false);
+    assert.ok(themeButton.focusCount > 0);
+
+    await invokeHandler(themeButton, 'onClick', new Event('click'));
+    const reopenedDarkOption = findElement(root, 'aria-label', 'Dark mode');
+    assert.ok(reopenedDarkOption);
+    await invokeHandler(reopenedDarkOption, 'onClick', new Event('click'));
+    assert.deepEqual(emitted, [
+        { name: 'select-theme', value: 'dark' },
+        { name: 'select-theme', value: 'dark' },
+    ]);
+
+    await invokeHandler(themeButton, 'onClick', new Event('click'));
+    const autoOption = findElement(root, 'aria-label', 'Auto');
+    assert.ok(autoOption);
+    await invokeHandler(autoOption, 'onClick', new Event('click'));
+    assert.deepEqual(emitted.at(-1), { name: 'select-theme', value: 'auto' });
+
+    const darkMode = mountTopBar(t, null, false, false, true, false, true, 'dark');
+    const darkThemeButton = findElement(darkMode.root, 'aria-label', 'Theme: Dark mode');
     assert.ok(darkThemeButton);
-    assert.equal(darkThemeButton.props['aria-label'], 'Dark mode');
-    assert.equal(darkThemeButton.props['aria-pressed'], true);
-    assert.equal(darkThemeButton.props.title, 'Switch to light mode');
     assert.ok(findElement(darkThemeButton, 'class', 'bi bi-moon'));
 });

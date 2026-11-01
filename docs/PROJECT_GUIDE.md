@@ -46,7 +46,8 @@ there are unapplied edits prompts you to keep editing or discard those edits.
 
 - **Top bar:** Shows the current filename and provides pixel-ruler, animation,
   theme, and close-image controls. Select the filename, extension, or pen icon
-  to rename it.
+  to rename it. Open the theme control to choose Light, Dark, or Auto, which
+  follows your operating system's appearance setting.
 - **Left toolbar:** Contains image import and export, undo and redo, editing
   tools, and zoom controls. On a short window, some tools may be grouped under
   **More tools**.

@@ -29,6 +29,7 @@
     import { useToolCloseGuard } from './composables/useToolCloseGuard';
     import { isFloatingTool } from './lib/toolDraft';
     import { hasShortcutModifier } from './lib/shortcuts';
+    import { isThemeMode, type ThemeMode } from './lib/theme';
 
     const {
         bitmap, info, documentId, status, error, isBusy, importImage, exportImage, cropImage, rotateImage,
@@ -150,13 +151,15 @@
     async function downloadExport(prepared: PreparedExport) {
         if (await exportImage(prepared)) exportOpen.value = false;
     }
-    const isDarkMode = ref(true);
+    const themeMode = shallowRef<ThemeMode>('light');
     const themeStorageKey = 'image-editor-theme';
+    const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const systemPrefersDark = shallowRef(systemThemeQuery.matches);
 
     try {
         const savedTheme = localStorage.getItem(themeStorageKey);
-        if (savedTheme === 'light' || savedTheme === 'dark') {
-            isDarkMode.value = savedTheme === 'dark';
+        if (isThemeMode(savedTheme)) {
+            themeMode.value = savedTheme;
         } else if (savedTheme !== null) {
             console.warn('Ignoring an invalid saved theme preference:', savedTheme);
         }
@@ -164,17 +167,25 @@
         console.warn('Unable to restore the saved theme preference:', error);
     }
 
-    document.documentElement.dataset.theme = isDarkMode.value ? 'dark' : 'light';
+    const isDarkMode = computed(() => themeMode.value === 'auto'
+        ? systemPrefersDark.value
+        : themeMode.value === 'dark');
 
-    function toggleTheme() {
-        isDarkMode.value = !isDarkMode.value;
-        const theme = isDarkMode.value ? 'dark' : 'light';
-        document.documentElement.dataset.theme = theme;
+    watch(isDarkMode, (isDark) => {
+        document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+    }, { immediate: true });
+
+    function selectTheme(mode: ThemeMode) {
+        themeMode.value = mode;
         try {
-            localStorage.setItem(themeStorageKey, theme);
+            localStorage.setItem(themeStorageKey, mode);
         } catch (error) {
             console.warn('Unable to save the theme preference:', error);
         }
+    }
+
+    function onSystemThemeChange(event: MediaQueryListEvent) {
+        systemPrefersDark.value = event.matches;
     }
 
     function selectTool(tool: ToolId) {
@@ -263,11 +274,13 @@
         document.addEventListener('keydown', handleEditorShortcut);
         window.addEventListener('beforeunload', warnBeforeUnloadWithBrushStrokes);
         reducedMotionQuery.addEventListener('change', onReducedMotionChange);
+        systemThemeQuery.addEventListener('change', onSystemThemeChange);
     });
     onBeforeUnmount(() => {
         document.removeEventListener('keydown', handleEditorShortcut);
         window.removeEventListener('beforeunload', warnBeforeUnloadWithBrushStrokes);
         reducedMotionQuery.removeEventListener('change', onReducedMotionChange);
+        systemThemeQuery.removeEventListener('change', onSystemThemeChange);
     });
 
     function onReducedMotionChange(event: MediaQueryListEvent) {
@@ -283,11 +296,12 @@
             :image="info"
             :busy="toolBlocked"
             :is-dark-mode="isDarkMode"
+            :theme-mode="themeMode"
             :rulers-enabled="rulersEnabled"
             :navigation-animations-enabled="navigationAnimationsEnabled"
             :prefers-reduced-motion="prefersReducedMotion"
             @rename="renameImage"
-            @toggle-theme="toggleTheme"
+            @select-theme="selectTheme"
             @toggle-rulers="toggleRulers"
             @toggle-navigation-animations="toggleNavigationAnimations"
             @close="requestImageClose"
