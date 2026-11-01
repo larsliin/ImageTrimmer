@@ -107,7 +107,8 @@ class TestElement {
         if (this.type !== 'nav' || !heights) return this.measuredScrollHeight;
         const panel = findElement(this, 'class', 'tool-foldout__panel');
         const collapsedGroups = panel ? getPopupGroupLabels(panel).length : 0;
-        return heights[collapsedGroups] ?? this.measuredScrollHeight;
+        const historyCollapsed = panel && findElement(panel, 'aria-label', 'Edit history') ? 1 : 0;
+        return heights[collapsedGroups + historyCollapsed] ?? this.measuredScrollHeight;
     }
 
     set scrollHeight(value: number) {
@@ -266,7 +267,25 @@ function getToolIds(root: TestElement): string[] {
 function getPopupGroupLabels(root: TestElement): string[] {
     return findElements(root, 'role', 'group')
         .map((element) => element.props['aria-label'])
-        .filter((label): label is string => typeof label === 'string' && label !== 'More tools');
+        .filter((label): label is string =>
+            typeof label === 'string' && label !== 'More tools' && label !== 'Edit history');
+}
+
+function getPopupSections(root: TestElement): { label: string; actionIds: string[] }[] {
+    return findElements(root, 'role', 'group')
+        .filter((element) => element.props['aria-label'] !== 'More tools')
+        .map((element) => ({
+            label: String(element.props['aria-label']),
+            actionIds: getPopupActionIds(element),
+        }));
+}
+
+function getPopupActionIds(root: TestElement): string[] {
+    const actionId = root.props['data-tool-id'] ?? root.props['data-history-action'];
+    return [
+        ...(typeof actionId === 'string' ? [actionId] : []),
+        ...root.children.flatMap(getPopupActionIds),
+    ];
 }
 
 function findFoldoutPanel(root: TestElement, label: string): TestElement | null {
@@ -516,6 +535,122 @@ test('one shared popup combines collapsed groups and preserves fixed tool action
     assert.doesNotMatch(String(activeLauncher.props.class), /\bis-active\b/);
 });
 
+test('collapses tool groups progressively before undo and redo reach the menu', async (context) => {
+    installBrowserMocks();
+    const collapsed = mountRail({
+        clientHeight: 510,
+        scrollHeight: 500,
+        scrollHeightsByCollapsedCount: [500, 300, 180, 120, 90],
+    });
+    context.after(() => collapsed.app.unmount());
+    await settleLayout();
+
+    const rail = findElement(collapsed.root, 'tag', 'nav');
+    assert.ok(rail);
+
+    rail.clientHeight = 150;
+    triggerResizeObservers();
+    await settleLayout();
+    const panel = findFoldoutPanel(collapsed.root, 'More tools');
+    const inlineUndo = findElement(collapsed.root, 'data-history-action', 'undo');
+    assert.ok(panel && inlineUndo);
+    assert.deepEqual(getPopupGroupLabels(panel), ['Transform tools', 'Paint tools', 'Adjustment tools']);
+    assert.equal(isWithin(inlineUndo, panel), false);
+    assert.equal(findElement(panel, 'aria-label', 'Edit history'), null);
+
+    rail.clientHeight = 100;
+    triggerResizeObservers();
+    await settleLayout();
+    const launcher = findMoreToolsLauncher(collapsed.root);
+    assert.ok(launcher && panel);
+    assert.deepEqual(getPopupSections(panel), [
+        { label: 'Edit history', actionIds: ['undo', 'redo'] },
+        { label: 'Transform tools', actionIds: ['crop', 'resize', 'rotate'] },
+        { label: 'Paint tools', actionIds: ['brush'] },
+        {
+            label: 'Adjustment tools',
+            actionIds: ['levels', 'curves', 'brightness-contrast', 'color-mode', 'eyedropper'],
+        },
+    ]);
+    assert.deepEqual(getPopupGroupLabels(panel), ['Transform tools', 'Paint tools', 'Adjustment tools']);
+    for (const label of ['Import image', 'Export', 'Zoom in', 'Zoom out', 'Pan']) {
+        const fixedTool = findElement(collapsed.root, 'aria-label', label);
+        assert.ok(fixedTool, `${label} remains available in the toolbar`);
+        assert.equal(isWithin(fixedTool, panel), false, `${label} does not collapse into the menu`);
+    }
+    const historyGroup = findElement(panel, 'aria-label', 'Edit history');
+    assert.ok(historyGroup);
+    const undo = findElement(historyGroup, 'data-history-action', 'undo');
+    const redo = findElement(historyGroup, 'data-history-action', 'redo');
+    assert.ok(undo && redo);
+    assert.equal(findElement(collapsed.root, 'data-history-action', 'undo'), undo);
+    assert.equal(findElements(collapsed.root, 'data-history-action', 'undo').length, 1);
+    assert.equal(undo.type, 'button');
+    assert.equal(redo.type, 'button');
+    assert.equal(undo.props.disabled, false);
+    assert.equal(redo.props.disabled, false);
+    assert.match(String(undo.props.title), /^Undo last edit \(.+\+Z\)$/);
+    assert.match(String(redo.props.title), /^Redo last undone edit \(.+\+Y or .+\+Shift\+Z\)$/);
+
+    await click(launcher);
+    await click(undo);
+    assert.deepEqual(collapsed.emitted, [{ name: 'undo' }]);
+    assert.equal(focusedTestElement, launcher, 'undo returns focus to the menu launcher');
+    await click(launcher);
+    await click(redo);
+    assert.deepEqual(collapsed.emitted, [{ name: 'undo' }, { name: 'redo' }]);
+    assert.equal(focusedTestElement, launcher, 'redo returns focus to the menu launcher');
+
+    collapsed.updateProps({ canUndo: false, canRedo: false });
+    await settleLayout();
+    assert.equal(findElement(panel, 'data-history-action', 'undo')?.props.disabled, true);
+    assert.equal(findElement(panel, 'data-history-action', 'redo')?.props.disabled, true);
+
+    rail.clientHeight = 150;
+    triggerResizeObservers();
+    await settleLayout();
+    const restoredUndo = findElement(collapsed.root, 'data-history-action', 'undo');
+    assert.ok(restoredUndo);
+    assert.equal(isWithin(restoredUndo, panel), false);
+    assert.equal(findElement(panel, 'aria-label', 'Edit history'), null);
+    assert.deepEqual(getPopupGroupLabels(panel), ['Transform tools', 'Paint tools', 'Adjustment tools']);
+});
+
+test('preserves history action focus while its row moves into and out of the collapsed menu', async (context) => {
+    installBrowserMocks();
+    const resizing = mountRail({
+        clientHeight: 510,
+        scrollHeight: 500,
+        scrollHeightsByCollapsedCount: [500, 300, 180, 120, 90],
+    });
+    context.after(() => resizing.app.unmount());
+    await settleLayout();
+    const rail = findElement(resizing.root, 'tag', 'nav');
+    const inlineUndo = findElement(resizing.root, 'data-history-action', 'undo');
+    assert.ok(rail && inlineUndo);
+    inlineUndo.focus();
+
+    rail.clientHeight = 100;
+    triggerResizeObservers();
+    await settleLayout();
+
+    const resizeLauncher = findMoreToolsLauncher(resizing.root);
+    const resizePanel = findFoldoutPanel(resizing.root, 'More tools');
+    const popupUndo = findElement(resizing.root, 'data-history-action', 'undo');
+    assert.ok(resizeLauncher && resizePanel && popupUndo);
+    assert.equal(resizeLauncher.props['aria-expanded'], true);
+    assert.equal(isWithin(popupUndo, resizePanel), true);
+    assert.equal(focusedTestElement, popupUndo, 'collapsing the history row hands focus to its menu action');
+
+    rail.clientHeight = 150;
+    triggerResizeObservers();
+    await settleLayout();
+    const restoredUndo = findElement(resizing.root, 'data-history-action', 'undo');
+    assert.ok(restoredUndo);
+    assert.equal(isWithin(restoredUndo, resizePanel), false);
+    assert.equal(focusedTestElement, restoredUndo, 'history returns inline before any tool groups restore');
+});
+
 test('collapsing/restoring follows group order and the smallest rail can scroll', async (context) => {
     installBrowserMocks();
     const adjustable = mountRail({
@@ -584,7 +719,8 @@ test('collapsing/restoring follows group order and the smallest rail can scroll'
         'color-mode',
         'eyedropper',
     ]);
-    assert.equal(findElements(allToolsPanel, 'tag', 'hr').length, 2);
+    assert.equal(findElements(allToolsPanel, 'tag', 'hr').length, 3);
+    assert.ok(findElement(allToolsPanel, 'aria-label', 'Edit history'));
 
     rail.clientHeight = 250;
     triggerResizeObservers();

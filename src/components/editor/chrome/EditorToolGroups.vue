@@ -1,13 +1,22 @@
 <script setup lang="ts">
     import { computed } from 'vue';
     import { TOOL_GROUPS, type ToolId } from '@/types/editor';
+    import UndoIcon from '@/components/editor/icons/UndoIcon.vue';
+    import RedoIcon from '@/components/editor/icons/RedoIcon.vue';
+    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { shortcutModifierLabel } from '@/lib/shortcuts';
     import EditorToolFoldout from './EditorToolFoldout.vue';
     import EditorToolButton from './EditorToolButton.vue';
+
+    const modifier = shortcutModifierLabel();
 
     const props = defineProps<{
         activeTool: ToolId | null
         hasImage: boolean
         busy: boolean
+        canUndo: boolean
+        canRedo: boolean
+        historyCollapsed: boolean
         collapsedCount: number
         moreToolsOpen: boolean
     }>();
@@ -15,6 +24,8 @@
     const emit = defineEmits<{
         'select-tool': [tool: ToolId]
         'update:moreToolsOpen': [open: boolean]
+        undo: []
+        redo: []
     }>();
 
     const inlineGroups = computed(() => TOOL_GROUPS.filter((_, index) => !isCollapsed(index)));
@@ -24,7 +35,7 @@
     );
 
     function isCollapsed(index: number) {
-        return index >= TOOL_GROUPS.length - props.collapsedCount;
+        return index >= TOOL_GROUPS.length - Math.min(props.collapsedCount, TOOL_GROUPS.length);
     }
 
 </script>
@@ -58,6 +69,37 @@
                 :open="moreToolsOpen"
                 @update:open="emit('update:moreToolsOpen', $event)"
             >
+                <template v-if="historyCollapsed">
+                    <div class="tool-group-popup-section" role="group" aria-label="Edit history">
+                        <div class="tool-group tool-group--popup">
+                            <BaseButton
+                                variant="tool"
+                                aria-label="Undo"
+                                :title="`Undo last edit (${modifier}+Z)`"
+                                :disabled="!hasImage || busy || !canUndo"
+                                data-history-action="undo"
+                                @click="emit('undo')"
+                            >
+                                <UndoIcon />
+                            </BaseButton>
+                            <BaseButton
+                                variant="tool"
+                                aria-label="Redo"
+                                :title="`Redo last undone edit (${modifier}+Y or ${modifier}+Shift+Z)`"
+                                :disabled="!hasImage || busy || !canRedo"
+                                data-history-action="redo"
+                                @click="emit('redo')"
+                            >
+                                <RedoIcon />
+                            </BaseButton>
+                        </div>
+                    </div>
+                    <hr
+                        class="separator tool-group__separator"
+                        role="separator"
+                        aria-orientation="vertical"
+                    />
+                </template>
                 <template
                     v-for="(popupGroup, popupIndex) in collapsedGroups"
                     :key="popupGroup.id"

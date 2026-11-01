@@ -1,5 +1,5 @@
 <script setup lang="ts">
-    import { nextTick, shallowRef, useTemplateRef, watch } from 'vue';
+    import { computed, nextTick, shallowRef, useTemplateRef, watch } from 'vue';
     import {
         PAN_TOOL,
         TOOL_GROUPS,
@@ -41,7 +41,8 @@
     const COLLAPSE_ORDER: ToolGroupId[] = [...TOOL_GROUPS].reverse().map(({ id }) => id);
 
     const rail = useTemplateRef<HTMLElement>('rail');
-    const { collapsedCount } = useOverflowCollapse(rail, TOOL_GROUPS.length);
+    const { collapsedCount } = useOverflowCollapse(rail, TOOL_GROUPS.length + 1);
+    const historyCollapsed = computed(() => collapsedCount.value > TOOL_GROUPS.length);
     const moreToolsOpen = shallowRef(false);
 
     function groupForTool(tool: string | null | undefined): ToolGroupId | null {
@@ -79,6 +80,16 @@
             : TOOL_GROUPS.find((toolGroup) => toolGroup.id === group)?.tools[0]?.id ?? null;
         if (targetTool) focusRailTarget(`[data-tool-id="${targetTool}"]`);
     }
+
+    watch(historyCollapsed, (isCollapsed) => {
+        const activeElement = typeof document === 'undefined' ? null : document.activeElement;
+        const focusedHistoryAction = activeElement?.getAttribute('data-history-action');
+
+        if (focusedHistoryAction !== 'undo' && focusedHistoryAction !== 'redo') return;
+
+        moreToolsOpen.value = isCollapsed;
+        void nextTick(() => focusRailTarget(`[data-history-action="${focusedHistoryAction}"]`));
+    });
 
     watch(collapsedCount, (count, previousCount) => {
         const activeElement = typeof document === 'undefined' ? null : document.activeElement;
@@ -125,6 +136,14 @@
         emit('select-tool', tool);
         if (returnFocus) void nextTick(focusMoreToolsLauncher);
     }
+
+    function runHistoryAction(action: 'undo' | 'redo') {
+        const returnFocus = moreToolsOpen.value;
+        moreToolsOpen.value = false;
+        if (action === 'undo') emit('undo');
+        else emit('redo');
+        if (returnFocus) void nextTick(focusMoreToolsLauncher);
+    }
 </script>
 
 <template>
@@ -153,13 +172,19 @@
 
             <hr class="separator" />
 
-            <div class="tool-group" role="group" aria-label="Edit history">
+            <div
+                v-if="!historyCollapsed"
+                class="tool-group"
+                role="group"
+                aria-label="Edit history"
+            >
                 <BaseButton
                     variant="tool"
                     aria-label="Undo"
                     :title="`Undo last edit (${modifier}+Z)`"
                     :disabled="!hasImage || busy || !canUndo"
-                    @click="emit('undo')"
+                    data-history-action="undo"
+                    @click="runHistoryAction('undo')"
                 >
                     <UndoIcon />
                 </BaseButton>
@@ -168,22 +193,28 @@
                     aria-label="Redo"
                     :title="`Redo last undone edit (${modifier}+Y or ${modifier}+Shift+Z)`"
                     :disabled="!hasImage || busy || !canRedo"
-                    @click="emit('redo')"
+                    data-history-action="redo"
+                    @click="runHistoryAction('redo')"
                 >
                     <RedoIcon />
                 </BaseButton>
             </div>
 
-            <hr class="separator" />
+            <hr v-if="!historyCollapsed" class="separator" />
 
             <EditorToolGroups
                 :active-tool="activeTool"
                 :has-image="hasImage"
                 :busy="busy"
+                :can-undo="canUndo"
+                :can-redo="canRedo"
+                :history-collapsed="historyCollapsed"
                 :collapsed-count="collapsedCount"
                 :more-tools-open="moreToolsOpen"
                 @update:more-tools-open="moreToolsOpen = $event"
                 @select-tool="selectTool"
+                @undo="runHistoryAction('undo')"
+                @redo="runHistoryAction('redo')"
             />
 
             <hr class="separator" />
