@@ -17,21 +17,31 @@
     const panel = useTemplateRef<HTMLDivElement>('panel');
     const panelStyle = ref<Record<string, string>>({});
 
-    // Aligns the panel with the toggle, shifting it up when needed so it stays inside the viewport.
+    // Centers the panel on the toggle and clamps it to the viewport.
     async function positionPanel() {
         const rect = toggleButton.value?.getBoundingClientRect();
         if (!rect) return;
         const left = rect.right + PANEL_GAP;
         const maxWidth = `${Math.max(window.innerWidth - left - VIEWPORT_MARGIN, 0)}px`;
-        panelStyle.value = { top: `${rect.top}px`, left: `${left}px`, maxWidth };
+        const viewportHeight = window.innerHeight;
+        const availableHeight = Math.max(viewportHeight - VIEWPORT_MARGIN * 2, 0);
+        panelStyle.value = {
+            top: `${VIEWPORT_MARGIN}px`,
+            left: `${left}px`,
+            maxWidth,
+        };
         await nextTick();
-        const height = panel.value?.scrollHeight ?? 0;
-        const top = Math.max(VIEWPORT_MARGIN, Math.min(rect.top, window.innerHeight - height - VIEWPORT_MARGIN));
+        const height = panel.value?.getBoundingClientRect().height ?? 0;
+        const isTooTall = height > availableHeight;
+        const visibleHeight = Math.min(height, availableHeight);
+        const centeredTop = rect.top + rect.height / 2 - visibleHeight / 2;
+        const maxTop = Math.max(VIEWPORT_MARGIN, viewportHeight - visibleHeight - VIEWPORT_MARGIN);
+        const top = Math.min(Math.max(centeredTop, VIEWPORT_MARGIN), maxTop);
         panelStyle.value = {
             top: `${top}px`,
             left: `${left}px`,
             maxWidth,
-            maxHeight: `${Math.max(window.innerHeight - top - VIEWPORT_MARGIN, 0)}px`,
+            ...(isTooTall ? { maxHeight: `${availableHeight}px` } : {}),
         };
     }
 

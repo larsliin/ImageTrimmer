@@ -81,6 +81,10 @@ interface RailSize {
 }
 
 let focusedTestElement: TestElement | null = null;
+let testLauncherTop = 24;
+let testViewportWidth = 1280;
+let testViewportHeight = 420;
+let windowResizeHandler: (() => void) | null = null;
 
 class TestElement {
     readonly props: Record<string, unknown> = {};
@@ -130,7 +134,23 @@ class TestElement {
     }
 
     getBoundingClientRect() {
-        return { top: 24, right: 48 } as DOMRect;
+        const isLauncher = this.props['data-more-tools-launcher'] === 'true';
+        const top = isLauncher ? testLauncherTop : 24;
+        const maximumHeight = Number.parseFloat(this.style.maxHeight ?? '');
+        const height = this.props.class === 'tool-foldout__panel'
+            ? Number.isFinite(maximumHeight) ? Math.min(this.scrollHeight, maximumHeight) : this.scrollHeight
+            : 36;
+        return {
+            top,
+            right: 48,
+            bottom: top + height,
+            height,
+            left: 12,
+            width: 36,
+            x: 12,
+            y: top,
+            toJSON() {},
+        } as DOMRect;
     }
 
     focus() {
@@ -188,10 +208,17 @@ function mountRail(railSize: RailSize, props: RailProps = {}) {
             node.text = text;
             node.children.splice(0);
         },
-        patchProp(node, key, _previous, next) {
+        patchProp(node, key, previous, next) {
             node.props[key] = next;
-            if (key === 'style' && next && typeof next === 'object') {
-                Object.assign(node.style, next);
+            if (key === 'style') {
+                if (previous && typeof previous === 'object') {
+                    for (const styleName of Object.keys(previous)) {
+                        if (!next || typeof next !== 'object' || !(styleName in next)) {
+                            delete node.style[styleName];
+                        }
+                    }
+                }
+                if (next && typeof next === 'object') Object.assign(node.style, next);
             }
         },
         parentNode: (node) => node.parent,
@@ -356,6 +383,10 @@ async function click(element: TestElement | null) {
 function installBrowserMocks() {
     resizeObservers = new Set();
     focusedTestElement = null;
+    testLauncherTop = 24;
+    testViewportWidth = 1280;
+    testViewportHeight = 420;
+    windowResizeHandler = null;
     type TestResizeObserverCallback = () => void;
     class TestResizeObserver {
         private readonly callback: TestResizeObserverCallback;
@@ -371,7 +402,18 @@ function installBrowserMocks() {
     Object.defineProperty(globalThis, 'ResizeObserver', { configurable: true, value: TestResizeObserver });
     Object.defineProperty(globalThis, 'window', {
         configurable: true,
-        value: { innerWidth: 1280, innerHeight: 420, addEventListener() {}, removeEventListener() {} },
+        value: {
+            get innerWidth() { return testViewportWidth; },
+            get innerHeight() { return testViewportHeight; },
+            addEventListener(event: string, handler: unknown) {
+                if (event === 'resize' && typeof handler === 'function') {
+                    windowResizeHandler = handler as () => void;
+                }
+            },
+            removeEventListener(event: string) {
+                if (event === 'resize') windowResizeHandler = null;
+            },
+        },
     });
     Object.defineProperty(globalThis, 'document', {
         configurable: true,
@@ -533,6 +575,54 @@ test('one shared popup combines collapsed groups and preserves fixed tool action
     assert.ok(activeLauncher);
     assert.equal(activeLauncher.props['aria-expanded'], false);
     assert.doesNotMatch(String(activeLauncher.props.class), /\bis-active\b/);
+});
+
+test('positions the shared popup around its launcher within viewport margins', async (context) => {
+    installBrowserMocks();
+    const { app, root } = mountRail({ clientHeight: 250, scrollHeight: 500 });
+    context.after(() => app.unmount());
+    await settleLayout();
+
+    const launcher = findMoreToolsLauncher(root);
+    const panel = findFoldoutPanel(root, 'More tools');
+    assert.ok(launcher && panel);
+
+    async function position(top: number, height: number) {
+        testLauncherTop = top;
+        panel.scrollHeight = height;
+        await click(launcher);
+        await settleLayout();
+        const style = { ...panel.style };
+        await click(launcher);
+        await settleLayout();
+        return style;
+    }
+
+    const centeredStyle = await position(24, 40);
+    assert.equal(centeredStyle.top, '22px', 'a short panel centers vertically on the launcher');
+    assert.equal(centeredStyle.left, '54px', 'the panel retains the 6px gap to the launcher');
+    assert.equal(centeredStyle.maxWidth, '1218px');
+    assert.equal(centeredStyle.maxHeight, undefined, 'a panel that fits is not height-constrained');
+    assert.equal((await position(0, 100)).top, '8px', 'the panel stays clear of the top viewport margin');
+    assert.equal((await position(360, 100)).top, '312px', 'the panel stays clear of the bottom viewport margin');
+    const tallPanelStyle = await position(24, 500);
+    assert.equal(tallPanelStyle.top, '8px');
+    assert.equal(tallPanelStyle.maxHeight, '404px', 'a tall panel is constrained to the available viewport height');
+
+    testLauncherTop = 360;
+    panel.scrollHeight = 100;
+    await click(launcher);
+    await settleLayout();
+    testLauncherTop = 24;
+    testViewportWidth = 800;
+    testViewportHeight = 300;
+    windowResizeHandler?.();
+    await settleLayout();
+    assert.equal(panel.style.top, '8px', 'resizing repositions an open panel around its launcher');
+    assert.equal(panel.style.maxWidth, '738px');
+    assert.equal(panel.style.maxHeight, undefined, 'a panel that fits remains unconstrained after resizing');
+    const foldoutStyles = await readComponentStyles('src/components/editor/chrome/EditorToolFoldout.vue');
+    assert.match(foldoutStyles, /\.tool-foldout__panel\s*\{[^}]*overflow-y:\s*auto;/s);
 });
 
 test('collapses tool groups progressively before undo and redo reach the menu', async (context) => {
