@@ -1,6 +1,6 @@
-# ImageTrim
+# ImageTrimmer
 
-ImageTrim is a lightweight, browser-based image editor for cropping,
+ImageTrimmer is a lightweight, browser-based image editor for cropping,
 resizing, rotating, and adjusting images. Image files are processed locally in
 your browser; they are not uploaded to a server. An optional Chrome extension
 opens the editor in its own tab.
@@ -98,7 +98,7 @@ changes, check narrow desktop widths and confirm all actions remain reachable.
 1. Run `npm run build:extension`.
 2. Visit `chrome://extensions` and enable **Developer mode**.
 3. Choose **Load unpacked** and select the generated `dist-extension` folder.
-4. Pin ImageTrim and click its toolbar button to open the editor in a new tab.
+4. Pin ImageTrimmer and click its toolbar button to open the editor in a new tab.
 
 The extension uses the editor's local file picker and standard browser
 downloads. It does not access images on websites or request website

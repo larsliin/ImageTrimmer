@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "ImageTrim",
+    "name": "ImageTrimmer",
     "version": "0.0.0",
     "description": "Crop, resize, rotate, and adjust images locally in your browser.",
     "icons": {
@@ -10,7 +10,7 @@
         "128": "icon-128.png"
     },
     "action": {
-        "default_title": "Open ImageTrim",
+        "default_title": "Open ImageTrimmer",
         "default_icon": {
             "16": "icon-16.png",
             "32": "icon-32.png",

@@ -45,7 +45,7 @@ Follow the [project instructions](../copilot-instructions.md).
 
 ## Project fit and existing patterns
 
-- Keep ImageTrim lightweight and focused on cropping, resizing, rotation, and
+- Keep ImageTrimmer lightweight and focused on cropping, resizing, rotation, and
   simple color adjustments. Do not introduce layers, accounts, backend services,
   or advanced editing workflows unless explicitly requested.
 - Inspect the relevant UI, project documentation, shared components, and design

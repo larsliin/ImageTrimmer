@@ -1,7 +1,7 @@
-# ImageTrim
+# ImageTrimmer
 
 For user-facing workflows, tool behavior, keyboard shortcuts, and export
-guidance, see the [ImageTrim user guide](../docs/PROJECT_GUIDE.md). Keep this
+guidance, see the [ImageTrimmer user guide](../docs/PROJECT_GUIDE.md). Keep this
 guide focused on helping users operate the app; implementation requirements
 belong in these Copilot instructions and the source code.
 

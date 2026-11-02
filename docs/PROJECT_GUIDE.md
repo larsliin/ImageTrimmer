@@ -1,6 +1,6 @@
-# ImageTrim user guide
+# ImageTrimmer user guide
 
-ImageTrim lets you make common image edits in your browser. This guide explains
+ImageTrimmer lets you make common image edits in your browser. This guide explains
 how to open an image, use the editing tools, and download your result.
 
 ## Contents
@@ -31,7 +31,7 @@ how to open an image, use the editing tools, and download your result.
 
 ## Getting started
 
-1. Open ImageTrim in a supported desktop browser.
+1. Open ImageTrimmer in a supported desktop browser.
 2. Select **Import image** from the left toolbar and choose an image file from
    your device.
 3. Choose a tool from the left toolbar to start editing.
@@ -271,7 +271,7 @@ with white; PNG and WebP preserve transparency. Re-encoding does not guarantee
 a smaller file. Export downloads the full image dimensions and does not
 overwrite the source image.
 
-The browser cannot confirm that a download has finished. ImageTrim warns when
+The browser cannot confirm that a download has finished. ImageTrimmer warns when
 you try to leave or replace an image with edits that have not been downloaded.
 
 ## Floating toolbars on narrow windows
@@ -294,7 +294,7 @@ by their grip.
 
 ## Privacy and image formats
 
-ImageTrim processes the image in your browser. It does not upload image data
+ImageTrimmer processes the image in your browser. It does not upload image data
 or metadata to a server. Choosing an image uses the browser's file picker, and
 export uses a normal browser download.
 
@@ -304,13 +304,13 @@ default to PNG when exporting.
 
 ## Use the Chrome extension
 
-The optional unpacked Chrome extension opens ImageTrim in a new browser tab.
+The optional unpacked Chrome extension opens ImageTrimmer in a new browser tab.
 To install it for local use:
 
 1. Build it with `npm run build:extension` from the project directory.
 2. Open `chrome://extensions` and enable **Developer mode**.
 3. Select **Load unpacked** and choose the generated `dist-extension` folder.
-4. Pin ImageTrim and select its toolbar button to open a new editor tab.
+4. Pin ImageTrimmer and select its toolbar button to open a new editor tab.
 
 The extension uses the same local file picker and browser download as the web
 app. It does not read images from websites or request website-access
