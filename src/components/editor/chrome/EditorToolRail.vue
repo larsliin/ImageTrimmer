@@ -270,8 +270,7 @@
     width: 48px;
     min-height: 0;
     padding: 8px 0;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
     scrollbar-width: thin;
     background-color: var(--color-panel);
     border-right: 1px solid var(--color-border);
