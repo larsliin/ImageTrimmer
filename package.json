@@ -13,7 +13,7 @@
     "type-check": "vue-tsc --build"
   },
   "dependencies": {
-    "bootstrap-icons": "^1.13.2",
+    "chrome-extension-component-library": "github:larsliin/ChromeExtensionsComponentLibrary#main",
     "vue": "^3.5.42"
   },
   "devDependencies": {

@@ -1,26 +1,32 @@
 <script setup lang="ts">
     import { useAttrs, useTemplateRef } from 'vue';
+    import { BaseNumberInput as LibraryNumberInput } from 'chrome-extension-component-library';
 
     defineProps<{ variant?: 'field' }>();
 
     const model = defineModel<number | string>();
     const attrs = useAttrs();
-    const input = useTemplateRef<HTMLInputElement>('input');
+    const input = useTemplateRef<InstanceType<typeof LibraryNumberInput>>('input');
 
     defineExpose({ focus: () => input.value?.focus() });
 
-    function updateValue(event: Event) {
-        if ('value' in attrs || !(event.target instanceof HTMLInputElement)) return;
-        const value = Number.parseFloat(event.target.value);
-        model.value = Number.isNaN(value) ? event.target.value : value;
+    function updateValue(value: number | string | undefined) {
+        // Native value/change callers own validation and commit timing.
+        if (!('value' in attrs)) model.value = value;
     }
 </script>
 
 <template>
-    <input ref="input" type="number" :value="model" :class="{ 'number-field': variant === 'field' }" @input="updateValue" />
+    <LibraryNumberInput ref="input" :model-value="model" :class="{ 'number-field': variant === 'field' }"
+        @update:model-value="updateValue" />
 </template>
 
 <style scoped>
+.number-input:not(.number-field) {
+    min-height: 0;
+    font: inherit;
+}
+
 .number-field {
     width: 100%;
     min-width: 0;

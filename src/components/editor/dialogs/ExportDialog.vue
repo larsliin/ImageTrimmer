@@ -1,5 +1,6 @@
 <script setup lang="ts">
     import { computed, shallowRef } from 'vue';
+    import { BaseSelect, type SelectOption } from 'chrome-extension-component-library';
     import { useExportPreview } from '@/composables/useExportPreview';
     import { EXPORT_QUALITY_PRESETS, exportFileName, type ExportMimeType, type PreparedExport } from '@/lib/imageIO';
     import type { ImageInfo } from '@/types/editor';
@@ -20,10 +21,19 @@
     const loadedPreviewUrl = shallowRef<string | null>(null);
     const mimeType = shallowRef<ExportMimeType>(props.image.exportMimeType);
     const quality = shallowRef<number>(0.92);
+    const formatOptions: SelectOption<ExportMimeType>[] = [
+        { value: 'image/jpeg', label: 'JPEG' },
+        { value: 'image/png', label: 'PNG (lossless)' },
+        { value: 'image/webp', label: 'WebP' },
+    ];
+    const qualityOptions = computed(() => mimeType.value === 'image/png'
+        ? [{ value: '', label: '' }]
+        : EXPORT_QUALITY_PRESETS.map((preset) => ({ value: String(preset.value), label: preset.label })));
     const displayedQuality = computed({
-        get: () => mimeType.value === 'image/png' ? '' : quality.value,
-        set: (value: number | '') => {
-            if (value !== '') quality.value = value;
+        get: () => mimeType.value === 'image/png' ? '' : String(quality.value),
+        set: (value: string) => {
+            const preset = EXPORT_QUALITY_PRESETS.find((item) => String(item.value) === value);
+            if (preset) quality.value = preset.value;
         },
     });
     const { result, previewUrl, calculating, error: previewError } = useExportPreview(() => props.bitmap, mimeType, quality);
@@ -60,17 +70,9 @@
     >
         <div class="export-fields">
             <div class="export-options">
-                <select v-model="mimeType" class="export-select" aria-label="Format">
-                    <option value="image/jpeg">JPEG</option>
-                    <option value="image/png">PNG (lossless)</option>
-                    <option value="image/webp">WebP</option>
-                </select>
-                <select v-model="displayedQuality" class="export-select" aria-label="Quality" :disabled="mimeType === 'image/png'">
-                    <option v-if="mimeType === 'image/png'" value=""></option>
-                    <option v-for="preset in EXPORT_QUALITY_PRESETS" :key="preset.value" :value="preset.value">
-                        {{ preset.label }}
-                    </option>
-                </select>
+                <BaseSelect v-model="mimeType" :options="formatOptions" class="export-select" aria-label="Format" />
+                <BaseSelect v-model="displayedQuality" :options="qualityOptions" class="export-select"
+                    aria-label="Quality" :disabled="mimeType === 'image/png'" />
             </div>
             <div class="export-preview" :aria-busy="calculating || (previewUrl !== null && loadedPreviewUrl !== previewUrl)">
                 <img v-if="previewUrl" class="export-preview__image" :src="previewUrl" alt="Encoded export preview"
@@ -105,22 +107,26 @@
     padding-block: 6px;
 }
 
-.export-select {
+.export-options > :deep(.select-wrapper) {
     flex: 1;
     min-width: 0;
-    padding: 6px 8px;
+}
+
+.export-options :deep(.export-select) {
+    padding: 6px 30px 6px 8px;
+    font: inherit;
     color: var(--color-text);
     background: var(--color-panel-raised);
     border: 1px solid var(--color-border);
     border-radius: 4px;
 }
 
-.export-select:focus-visible {
+.export-options :deep(.export-select:focus-visible) {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
 }
 
-.export-select:disabled {
+.export-options :deep(.export-select:disabled) {
     opacity: 0.5;
     cursor: not-allowed;
 }

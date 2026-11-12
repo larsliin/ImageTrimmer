@@ -48,8 +48,8 @@ function loadComponentUrl(path: string): Promise<string> {
 
         for (const specifier of imports) {
             let replacement: string;
-            if (specifier === 'vue') {
-                replacement = import.meta.resolve('vue');
+            if (specifier === 'vue' || specifier === 'chrome-extension-component-library') {
+                replacement = import.meta.resolve(specifier);
             } else if (specifier.startsWith('@/')) {
                 const aliasPath = resolveAliasPath(specifier);
                 replacement = aliasPath.endsWith('.vue')

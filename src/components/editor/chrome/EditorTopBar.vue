@@ -1,8 +1,7 @@
 <script setup lang="ts">
     import { computed, nextTick, shallowRef, useTemplateRef } from 'vue';
     import type { ImageInfo } from '@/types/editor';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
-    import DropdownSelect, { type DropdownOption } from '@/components/shared/DropdownSelect.vue';
+    import { BaseButton, BaseIconButton, BaseMenuSelect, type SelectOption } from 'chrome-extension-component-library';
     import type { ThemeMode } from '@/lib/theme';
 
     const props = defineProps<{
@@ -26,17 +25,17 @@
     const isEditing = shallowRef(false);
     const draftName = shallowRef('');
     const suppressFilenameFocusRing = shallowRef(false);
-    const filenameAction = useTemplateRef<HTMLButtonElement>('filenameAction');
+    const filenameAction = useTemplateRef<InstanceType<typeof BaseButton>>('filenameAction');
     const filenameInput = useTemplateRef<HTMLInputElement>('filenameInput');
-    const themeOptions: DropdownOption[] = [
-        { value: 'light', label: 'Light mode' },
-        { value: 'dark', label: 'Dark mode' },
-        { value: 'auto', label: 'Auto' },
+    const themeOptions: SelectOption<ThemeMode>[] = [
+        { value: 'light', label: 'Light mode' }, { value: 'dark', label: 'Dark mode' }, { value: 'auto', label: 'Auto' },
     ];
 
-    function selectTheme(value: string) {
-        if (value === 'light' || value === 'dark' || value === 'auto') emit('select-theme', value);
-    }
+    const selectedTheme = computed({
+        get: () => props.themeMode,
+        set: (mode: ThemeMode) => emit('select-theme', mode),
+    });
+    const themeIcons: Record<ThemeMode, string> = { light: 'bi-sun', dark: 'bi-moon', auto: 'bi-circle-half' };
 
     const fileName = computed(() => props.image?.fileName ?? 'No image');
     const fileNameBase = computed(() => {
@@ -78,7 +77,6 @@
             filenameAction.value?.focus();
         }
     }
-
 </script>
 
 <template>
@@ -92,9 +90,10 @@
                     <i class="document-detail__icon bi bi-file-earmark-image" aria-hidden="true"></i>
                 </dt>
                 <dd class="filename-controls" :class="{ 'filename-controls--editing': isEditing }">
-                    <button
+                    <BaseButton
                         v-if="!isEditing"
                         ref="filenameAction"
+                        variant="bare"
                         class="filename-control filename-control--action"
                         type="button"
                         :aria-label="`Rename ${fileName}`"
@@ -116,7 +115,7 @@
                             class="filename-edit-indicator bi bi-pencil"
                             aria-hidden="true"
                         ></i>
-                    </button>
+                    </BaseButton>
                     <div v-else class="filename-control">
                         <div class="filename-field">
                             <div class="filename-base">
@@ -147,20 +146,20 @@
             </div>
         </dl>
         <div class="controls-group">
-            <BaseButton
+            <BaseIconButton
                 class="rulers-toggle"
-                aria-label="Pixel rulers"
-                :aria-pressed="rulersEnabled"
+                label="Pixel rulers"
+                :active="rulersEnabled"
                 :title="rulersEnabled ? 'Hide pixel rulers' : 'Show pixel rulers'"
                 :disabled="busy || !image"
                 @click="emit('toggle-rulers')"
             >
                 <i class="bi bi-rulers" aria-hidden="true"></i>
-            </BaseButton>
-            <BaseButton
+            </BaseIconButton>
+            <BaseIconButton
                 class="navigation-animation-toggle"
-                aria-label="Animated zoom and pan"
-                :aria-pressed="navigationAnimationsEnabled"
+                label="Animated zoom and pan"
+                :active="navigationAnimationsEnabled"
                 :title="prefersReducedMotion
                     ? 'Animated zoom and pan are disabled by your system reduced-motion setting'
                     : navigationAnimationsEnabled
@@ -170,26 +169,31 @@
                 @click="emit('toggle-navigation-animations')"
             >
                 <i class="bi bi-wind" aria-hidden="true"></i>
-            </BaseButton>
-            <DropdownSelect
+            </BaseIconButton>
+            <BaseMenuSelect
                 class="theme-picker"
                 label="Theme"
-                :model-value="themeMode"
+                v-model="selectedTheme"
                 :options="themeOptions"
-                @select="selectTheme"
             >
-                <i :class="isDarkMode ? 'bi bi-moon' : 'bi bi-sun'" aria-hidden="true"></i>
-            </DropdownSelect>
+                <template #default>
+                    <i :class="isDarkMode ? 'bi bi-moon' : 'bi bi-sun'" aria-hidden="true"></i>
+                </template>
+                <template #option="{ option }">
+                    <i class="bi" :class="themeIcons[option.value]" aria-hidden="true"></i>
+                    <span>{{ option.label }}</span>
+                </template>
+            </BaseMenuSelect>
         </div>
-        <BaseButton
+        <BaseIconButton
             class="close-button"
-            aria-label="Close image"
+            label="Close image"
             title="Close and unload the current image"
             :disabled="!image"
             @click="emit('close')"
         >
             <i class="bi bi-x-lg" aria-hidden="true"></i>
-        </BaseButton>
+        </BaseIconButton>
     </header>
 </template>
 
@@ -229,50 +233,6 @@
     margin-left: 14px;
 }
 
-.rulers-toggle,
-.navigation-animation-toggle {
-    display: grid;
-    flex: 0 0 auto;
-    place-items: center;
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    color: var(--color-text-muted);
-    background-color: var(--color-panel-raised);
-    cursor: pointer;
-}
-
-.rulers-toggle {
-    display: flex;
-    justify-content: center;
-    gap: 5px;
-    width: auto;
-    margin-left: auto;
-    margin-right: 8px;
-    padding: 0 8px;
-    font-size: 0.75rem;
-}
-
-.rulers-toggle:disabled,
-.navigation-animation-toggle:disabled {
-    opacity: var(--opacity-button-secondary-disabled);
-    cursor: default;
-}
-
-.rulers-toggle:hover:not(:disabled),
-.navigation-animation-toggle:hover:not(:disabled) {
-    color: var(--color-text);
-    background-color: var(--color-hover);
-}
-
-.rulers-toggle:focus-visible,
-.navigation-animation-toggle:focus-visible {
-    outline: 1px solid var(--color-focus);
-    outline-offset: 1px;
-}
-
 .controls-group {
     display: flex;
     align-items: center;
@@ -289,6 +249,7 @@
 .controls-group .rulers-toggle,
 .controls-group .navigation-animation-toggle {
     display: grid;
+    flex: 0 0 auto;
     place-items: center;
     margin: 0;
     padding: 0;
@@ -297,6 +258,14 @@
     background-color: transparent;
     border: none;
     border-radius: 4px;
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+}
+
+.rulers-toggle .bi-rulers::before,
+.navigation-animation-toggle .bi-wind::before {
+    display: block;
+    transform: translateY(1px);
 }
 
 .controls-group .rulers-toggle:hover:not(:disabled),
@@ -328,7 +297,7 @@
     cursor: default;
 }
 
-.controls-group :deep(.dropdown-select__trigger) {
+.controls-group :deep(.menu-select__trigger) {
     display: grid;
     place-items: center;
     width: 24px;
@@ -339,7 +308,7 @@
     border-radius: 4px;
 }
 
-.controls-group :deep(.dropdown-select__trigger:focus-visible) {
+.controls-group :deep(.menu-select__trigger:focus-visible) {
     outline: 1px solid var(--color-focus);
     outline-offset: -3px;
 }
@@ -469,12 +438,18 @@
 
 .filename-control--action:disabled {
     color: var(--color-text-muted);
+    opacity: 1;
     cursor: default;
 }
 
 .filename-control--action {
     appearance: none;
     cursor: pointer;
+    outline: none;
+    border-radius: 0;
+}
+
+.filename-control--action:focus-visible {
     outline: none;
 }
 

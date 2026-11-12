@@ -11,7 +11,7 @@
     import PanIcon from '@/components/editor/icons/PanIcon.vue';
     import UndoIcon from '@/components/editor/icons/UndoIcon.vue';
     import RedoIcon from '@/components/editor/icons/RedoIcon.vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseIconButton } from 'chrome-extension-component-library';
     import { shortcutModifierLabel } from '@/lib/shortcuts';
 
     const modifier = shortcutModifierLabel();
@@ -150,24 +150,24 @@
     <nav ref="rail" class="tool-rail" aria-label="Editor tools">
         <fieldset class="tool-rail__controls" :disabled="popupOpen" aria-label="Editor tools">
             <div class="tool-group" role="group" aria-label="File">
-                <BaseButton
+                <BaseIconButton
                     variant="tool"
-                    aria-label="Import image"
+                    label="Import image"
                     title="Import image"
                     :disabled="busy"
                     @click="emit('import')"
                 >
                     <i class="bi bi-folder2-open" aria-hidden="true"></i>
-                </BaseButton>
-                <BaseButton
+                </BaseIconButton>
+                <BaseIconButton
                     variant="tool"
-                    aria-label="Export"
+                    label="Export"
                     title="Export"
                     :disabled="!hasImage || busy"
                     @click="emit('export')"
                 >
                     <i class="bi bi-download" aria-hidden="true"></i>
-                </BaseButton>
+                </BaseIconButton>
             </div>
 
             <hr class="separator" />
@@ -178,26 +178,26 @@
                 role="group"
                 aria-label="Edit history"
             >
-                <BaseButton
+                <BaseIconButton
                     variant="tool"
-                    aria-label="Undo"
+                    label="Undo"
                     :title="`Undo last edit (${modifier}+Z)`"
                     :disabled="!hasImage || busy || !canUndo"
                     data-history-action="undo"
                     @click="runHistoryAction('undo')"
                 >
                     <UndoIcon />
-                </BaseButton>
-                <BaseButton
+                </BaseIconButton>
+                <BaseIconButton
                     variant="tool"
-                    aria-label="Redo"
+                    label="Redo"
                     :title="`Redo last undone edit (${modifier}+Y or ${modifier}+Shift+Z)`"
                     :disabled="!hasImage || busy || !canRedo"
                     data-history-action="redo"
                     @click="runHistoryAction('redo')"
                 >
                     <RedoIcon />
-                </BaseButton>
+                </BaseIconButton>
             </div>
 
             <hr v-if="!historyCollapsed" class="separator" />
@@ -220,35 +220,34 @@
             <hr class="separator" />
 
             <div class="tool-group" role="group" aria-label="View tools">
-                <BaseButton
+                <BaseIconButton
                     variant="tool"
-                    aria-label="Zoom in"
+                    label="Zoom in"
                     :title="`Zoom in (${modifier}++)`"
                     :disabled="!canZoomIn"
                     @click="emit('zoom-in')"
                 >
                     <i class="bi bi-zoom-in" aria-hidden="true"></i>
-                </BaseButton>
-                <BaseButton
+                </BaseIconButton>
+                <BaseIconButton
                     variant="tool"
-                    aria-label="Zoom out"
+                    label="Zoom out"
                     :title="`Zoom out (${modifier}+-)`"
                     :disabled="!canZoomOut"
                     @click="emit('zoom-out')"
                 >
                     <i class="bi bi-zoom-out" aria-hidden="true"></i>
-                </BaseButton>
-                <BaseButton
+                </BaseIconButton>
+                <BaseIconButton
                     variant="tool"
-                    :class="{ 'is-active': activeTool === PAN_TOOL.id }"
-                    :aria-pressed="activeTool === PAN_TOOL.id"
-                    :aria-label="PAN_TOOL.label"
+                    :active="activeTool === PAN_TOOL.id"
+                    :label="PAN_TOOL.label"
                     :title="PAN_TOOL.label"
                     :disabled="!hasImage || busy"
                     @click="selectTool(PAN_TOOL.id)"
                 >
                     <PanIcon />
-                </BaseButton>
+                </BaseIconButton>
             </div>
         </fieldset>
     </nav>

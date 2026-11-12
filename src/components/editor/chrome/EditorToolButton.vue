@@ -1,6 +1,6 @@
 <script setup lang="ts">
     import CurvesIcon from '@/components/editor/icons/CurvesIcon.vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseIconButton } from 'chrome-extension-component-library';
     import type { ToolDefinition, ToolGroupId, ToolId } from '@/types/editor';
 
     defineProps<{
@@ -16,11 +16,10 @@
 </script>
 
 <template>
-    <BaseButton
+    <BaseIconButton
         variant="tool"
-        :class="{ 'is-active': active }"
-        :aria-pressed="active"
-        :aria-label="tool.label"
+        :active="active"
+        :label="tool.label"
         :title="tool.label"
         :data-tool-id="tool.id"
         :data-tool-group="groupId"
@@ -29,5 +28,5 @@
     >
         <CurvesIcon v-if="tool.id === 'curves'" />
         <i v-else class="bi" :class="tool.icon" aria-hidden="true"></i>
-    </BaseButton>
+    </BaseIconButton>
 </template>

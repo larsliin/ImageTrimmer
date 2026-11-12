@@ -1,5 +1,6 @@
 <script setup lang="ts">
-    import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue';
+    import { BaseAlert, BaseButton } from 'chrome-extension-component-library';
+    import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch, type ComponentPublicInstance } from 'vue';
     import { displaySize, type Size } from '@/lib/zoom';
     import { usePan } from '@/composables/usePan';
     import { useCanvasWheelZoom, type WheelZoomAnchor } from '@/composables/useCanvasWheelZoom';
@@ -231,6 +232,11 @@
         },
         { flush: 'pre' },
     );
+    function labelErrorDismissal(instance: Element | ComponentPublicInstance | null) {
+        // BaseAlert currently fixes the close label to "Dismiss"; retain the app's name.
+        const root: unknown = instance && '$el' in instance ? instance.$el : instance;
+        if (root instanceof HTMLElement) root.querySelector('.dismiss')?.setAttribute('aria-label', 'Dismiss error');
+    }
 </script>
 
 <template>
@@ -243,13 +249,7 @@
         @dragleave="handleDragLeave"
         @drop="handleDrop"
     >
-        <div v-if="error" class="error-banner" role="alert">
-            <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
-            <span>{{ error }}</span>
-            <button type="button" class="dismiss-button" aria-label="Dismiss error" @click="emit('dismiss-error')">
-                <i class="bi bi-x-lg" aria-hidden="true"></i>
-            </button>
-        </div>
+        <BaseAlert v-if="error" :ref="labelErrorDismissal" class="error-banner" :message="error" dismissible @dismiss="emit('dismiss-error')" />
 
         <div
             ref="viewport"
@@ -299,9 +299,9 @@
                 />
             </div>
             <div v-else class="empty-state">
-                <button type="button" class="import-button" @click="emit('import')">
+                <BaseButton type="button" variant="primary" class="import-button" @click="emit('import')">
                     <span>Open image</span>
-                </button>
+                </BaseButton>
                 <span class="empty-state__separator">or</span>
                 <p class="empty-state__title">Drag and drop it here</p>
             </div>
@@ -454,7 +454,13 @@
     font-weight: 600;
 }
 
-.import-button:hover {
+.import-button:hover:not(:disabled),
+.import-button:active:not(:disabled) {
+    background-color: var(--color-accent);
+    border-color: transparent;
+}
+
+.import-button:hover:not(:disabled) {
     filter: brightness(1.1);
 }
 
@@ -469,31 +475,13 @@
     top: 12px;
     left: 50%;
     z-index: 1;
-    display: flex;
-    align-items: center;
-    gap: 10px;
     max-width: calc(100% - 24px);
     padding: 8px 8px 8px 12px;
-    color: #fecaca;
-    background-color: #3f1d1d;
-    border: 1px solid #7f1d1d;
-    border-radius: 4px;
     transform: translateX(-50%);
 }
 
-.dismiss-button {
-    display: grid;
-    place-items: center;
+.error-banner :deep(.dismiss) {
     width: 24px;
     height: 24px;
-    padding: 0;
-    background: transparent;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.dismiss-button:hover {
-    background-color: rgb(255 255 255 / 10%);
 }
 </style>

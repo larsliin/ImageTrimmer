@@ -15,6 +15,7 @@ const script = compileScript(descriptor, { id: 'crop-controls-test' }).content
     .replace('__expose();', '')
     .replace('return __returned__', '__expose(__returned__); return __returned__');
 const compiled = transpileModule(script, { compilerOptions: { module: ModuleKind.ESNext } }).outputText
+    .replaceAll("'chrome-extension-component-library'", JSON.stringify(import.meta.resolve('chrome-extension-component-library')))
     .replaceAll("'vue'", JSON.stringify(import.meta.resolve('vue')))
     .replaceAll("'@/lib/crop'", JSON.stringify(new URL('../crop.ts', import.meta.url).href));
 const { default: controls }: { default: Component } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);

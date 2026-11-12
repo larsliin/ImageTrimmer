@@ -5,14 +5,13 @@ import test, { type TestContext } from 'node:test';
 import { createRenderer, nextTick, type Component } from 'vue';
 import { compileScript, parse } from 'vue/compiler-sfc';
 import { transpileModule, ModuleKind } from 'typescript';
-import { baseControlUrl } from '../../components/bascomponents/__tests__/loadBaseControl.ts';
 
 async function loadComponent(name: string): Promise<Component> {
     const source = await readFile(new URL(`../../components/editor/${name === 'ToolModal' ? 'dialogs' : 'chrome'}/${name}.vue`, import.meta.url), 'utf8');
     const { descriptor } = parse(source);
     const script = compileScript(descriptor, { id: `${name}-drag-test`, inlineTemplate: true }).content;
     const compiled = transpileModule(script, { compilerOptions: { module: ModuleKind.ESNext } }).outputText
-        .replaceAll("'@/components/bascomponents/BaseButton.vue'", JSON.stringify(await baseControlUrl('BaseButton')))
+        .replaceAll("'chrome-extension-component-library'", JSON.stringify(import.meta.resolve('chrome-extension-component-library')))
         .replaceAll(/(['"])vue\1/g, JSON.stringify(import.meta.resolve('vue')))
         .replaceAll("'@/lib/drag'", JSON.stringify(new URL('../drag.ts', import.meta.url).href))
         .replaceAll("'@/composables/useDragOffset'", JSON.stringify(new URL('../../composables/useDragOffset.ts', import.meta.url).href));

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createRenderer, nextTick, type Component } from 'vue';
+import { createRenderer, defineComponent, h, nextTick, shallowRef, type Component } from 'vue';
+import { BaseAlert, BaseIconButton, BaseSelect } from 'chrome-extension-component-library';
 import { baseControlUrl } from './loadBaseControl.ts';
 
 class TestInput {
@@ -22,19 +23,49 @@ interface TestElement {
     valuePatches?: number
     focus?: () => void
     getBoundingClientRect?: () => DOMRect
+    children: TestElement[]
+    listeners: Map<string, TestListener[]>
+    checked: boolean
+    querySelector: () => TestElement | undefined
 }
+
+// eslint-disable-next-line no-unused-vars
+type TestListener = (event: Event) => void;
 
 function mountControl(component: Component, props: Record<string, unknown>) {
     const elements: TestElement[] = [];
     const renderer = createRenderer<TestElement, TestElement>({
         createElement(tag) {
-            const element = { tag, props: {} };
+            const props: Record<string, unknown> = {};
+            const listeners = new Map<string, TestListener[]>();
+            const children: TestElement[] = [];
+            const element = {
+                tag, tagName: tag.toUpperCase(), props, children, listeners, checked: false,
+                get options() { return children.filter((child) => child.tag === 'option'); },
+                get value() { return props.value; },
+                set value(value: unknown) { props.value = value; },
+                get className() { return String(props.class ?? ''); },
+                set className(value: string) { props.class = value; },
+                querySelector: () => children.find((child) => child.tag === 'input'),
+                setAttribute: (key: string, value: unknown) => { props[key] = value; },
+                removeAttribute: (key: string) => { delete props[key]; },
+                addEventListener: (key: string, listener: TestListener) => {
+                    listeners.set(key, [...(listeners.get(key) ?? []), listener]);
+                },
+                removeEventListener: (key: string, listener: TestListener) => {
+                    listeners.set(key, (listeners.get(key) ?? []).filter((item) => item !== listener));
+                },
+            };
             elements.push(element);
             return element;
         },
         createText: () => ({ tag: '#text', props: {} }),
-        createComment: () => ({ tag: '#comment', props: {} }),
-        insert() {},
+        createComment: () => {
+            const element = { tag: '#comment', props: {}, children: [], listeners: new Map(), checked: false, querySelector: () => undefined };
+            elements.push(element);
+            return element;
+        },
+        insert(child, parent) { parent.children.push(child); },
         remove() {},
         setText() {},
         setElementText() {},
@@ -46,18 +77,20 @@ function mountControl(component: Component, props: Record<string, unknown>) {
         nextSibling: () => null,
     });
     const app = renderer.createApp(component, props);
-    app.mount({ tag: 'root', props: {} });
-    const element = elements[0];
+    app.mount({ tag: 'root', props: {}, children: [], listeners: new Map(), checked: false, querySelector: () => undefined });
+    const element = elements.find((item) => item.tag === 'input') ?? elements[0];
     assert.ok(element);
-    return { element, app };
+    return { element, elements, app };
 }
 
 function dispatch(element: TestElement, name: string, target: TestInput) {
     const event = new Event(name.slice(2).toLowerCase());
     Object.defineProperty(event, 'target', { value: target });
+    element.checked = target.checked;
+    for (const listener of element.listeners.get(event.type) ?? []) listener(event);
     const listeners = element.props[name];
-    assert.ok(listeners);
-    for (const listener of Array.isArray(listeners) ? listeners : [listeners]) listener(event);
+    assert.ok(listeners || element.listeners.has(event.type));
+    if (listeners) for (const listener of Array.isArray(listeners) ? listeners : [listeners]) listener(event);
     return event;
 }
 
@@ -78,7 +111,7 @@ test('range keeps a native root, numeric model, attributes and single native eve
         assert.equal(element.props.max, 100);
         assert.equal(element.props.step, 1);
         assert.equal(element.props.disabled, true);
-        assert.equal(element.props.class, 'existing-slider');
+        assert.equal(element.props.class, 'range-input existing-slider');
         assert.deepEqual(element.props.style, { width: '120px' });
         assert.equal(element.props['aria-label'], 'Brightness');
         const input = new TestInput();
@@ -147,7 +180,7 @@ test('number input preserves controlled value and change targets without a model
     try {
         assert.equal(element.props.value, 128);
         assert.equal(element.props.disabled, true);
-        assert.equal(element.props.class, 'field__input');
+        assert.equal(element.props.class, 'number-input field__input');
         const input = new TestInput();
         input.value = '30';
         const patches = element.valuePatches;
@@ -160,7 +193,7 @@ test('number input preserves controlled value and change targets without a model
     } finally { app.unmount(); }
 });
 
-test('checkbox emits one boolean update and forwards the original native change once', async () => {
+test('library checkbox routes attributes to its native input and delivers one boolean update/change', async () => {
     const updates: boolean[] = [];
     const events: Event[] = [];
     const { element, app } = mountControl(await loadControl('BaseCheckbox'), {
@@ -171,7 +204,7 @@ test('checkbox emits one boolean update and forwards the original native change 
     try {
         assert.equal(element.tag, 'input');
         assert.equal(element.props.type, 'checkbox');
-        assert.equal(element.props.checked, true);
+        assert.equal(element.checked, true);
         assert.equal(element.props.id, 'preview');
         assert.equal(element.props.name, 'preview');
         assert.equal(element.props.disabled, true);
@@ -182,6 +215,10 @@ test('checkbox emits one boolean update and forwards the original native change 
         assert.deepEqual(updates, [false, true]);
         assert.equal(events.length, 2);
         assert.equal(events[0], event);
+        let focuses = 0;
+        element.focus = () => { focuses += 1; };
+        app._instance?.exposed?.focus();
+        assert.equal(focuses, 1);
     } finally { app.unmount(); }
 });
 
@@ -197,7 +234,7 @@ test('button defaults to non-submit, forwards native attributes/events, and expo
         assert.equal(element.props.disabled, true);
         assert.equal(element.props.title, 'Undo');
         assert.equal(element.props['aria-pressed'], false);
-        assert.equal(element.props.class, 'tool-button is-active');
+        assert.equal(element.props.class, 'base-button tool-button is-active');
         dispatch(element, 'onClick', new TestInput());
         assert.equal(clicks, 1);
         let focuses = 0;
@@ -206,6 +243,9 @@ test('button defaults to non-submit, forwards native attributes/events, and expo
         assert.ok(instance);
         instance.focus();
         assert.equal(focuses, 1);
+        const rect = { x: 10, y: 20 } as DOMRect;
+        element.getBoundingClientRect = () => rect;
+        assert.equal(instance.getBoundingClientRect(), rect);
     } finally { app.unmount(); }
 });
 
@@ -216,4 +256,102 @@ test('button preserves explicit submit/reset types', async () => {
         try { assert.equal(element.props.type, type); }
         finally { app.unmount(); }
     }
+});
+
+test('icon actions omit pressed state, while toggles preserve false/true and native attributes', () => {
+    for (const active of [undefined, false, true]) {
+        const { element, app } = mountControl(BaseIconButton, {
+            label: 'Crop', active, disabled: true, title: 'Crop image', type: 'submit',
+        });
+        try {
+            assert.equal(element.tag, 'button');
+            assert.equal(element.props['aria-label'], 'Crop');
+            assert.equal(element.props.title, 'Crop image');
+            assert.equal(element.props['aria-pressed'], active);
+            assert.equal(element.props.disabled, true);
+            assert.equal(element.props.type, 'submit');
+            assert.equal(String(element.props.class).includes('is-active'), active === true);
+        } finally { app.unmount(); }
+    }
+});
+
+test('checkbox keeps library styling, updates/removes native attrs and listeners, and exposes focus', async () => {
+    const component = await loadControl('BaseCheckbox');
+    let changes = 0;
+    const attrs = shallowRef<Record<string, unknown>>({
+        modelValue: false, name: 'preview', class: 'checkbox', 'aria-label': 'Preview',
+        onChange: () => { changes += 1; },
+    });
+    const parent = defineComponent(() => () => h(component, attrs.value));
+    const { element, app } = mountControl(parent, {});
+    try {
+        assert.equal(element.props.class, 'base-checkbox checkbox');
+        assert.equal(element.props.name, 'preview');
+        dispatch(element, 'onChange', new TestInput());
+        assert.equal(changes, 1);
+        attrs.value = { modelValue: false, 'aria-label': 'Live preview', tabindex: -1 };
+        await nextTick();
+        assert.equal(element.props.name, undefined);
+        assert.equal(element.props.class, 'base-checkbox');
+        assert.equal(element.props['aria-label'], 'Live preview');
+        assert.equal(element.props.tabindex, -1);
+        // Only the library's model listener remains after removing the caller listener.
+        assert.equal(element.listeners.get('change')?.length, 1);
+    } finally { app.unmount(); }
+});
+
+test('dismissible error alert announces the message, emits once and renders nothing when empty', () => {
+    let dismissals = 0;
+    const { elements, element, app } = mountControl(BaseAlert, {
+        message: 'Could not load image', dismissible: true, onDismiss: () => { dismissals += 1; },
+    });
+    try {
+        assert.equal(element.props.role, 'alert');
+        const close = elements.find((item) => item.tag === 'button');
+        assert.ok(close);
+        assert.equal(close.props['aria-label'], 'Dismiss');
+        dispatch(close, 'onClick', new TestInput());
+        assert.equal(dismissals, 1);
+    } finally { app.unmount(); }
+    const empty = mountControl(BaseAlert, { message: '', dismissible: true });
+    try { assert.equal(empty.element.tag, '#comment'); }
+    finally { empty.app.unmount(); }
+});
+
+test('native shared select routes attrs/listeners to select, retains disabled options and one chevron', () => {
+    const updates: string[] = [];
+    const changes: Event[] = [];
+    const { elements, app } = mountControl(BaseSelect, {
+        modelValue: 'rgb', id: 'channel', class: 'channel-select__input', 'aria-label': 'Channel',
+        disabled: true, options: [
+            { value: 'rgb', label: 'RGB' }, { value: 'red', label: 'Red', disabled: true },
+        ],
+        'onUpdate:modelValue': (value: string) => updates.push(value),
+        onChange: (event: Event) => changes.push(event),
+    });
+    try {
+        const select = elements.find((item) => item.tag === 'select');
+        assert.ok(select);
+        assert.equal(select.props.id, 'channel');
+        assert.equal(select.props['aria-label'], 'Channel');
+        assert.equal(select.props.disabled, true);
+        assert.equal(select.props.class, 'channel-select__input base-select');
+        assert.equal(elements.filter((item) => String(item.props.class).includes('select-chevron')).length, 1);
+        const options = elements.filter((item) => item.tag === 'option');
+        assert.equal(options.length, 2);
+        assert.equal(options[1]?.props.disabled, true);
+        const first = options[0];
+        const second = options[1];
+        assert.ok(first && second);
+        Object.assign(first, { selected: false });
+        Object.assign(second, { selected: true });
+        const event = new Event('change');
+        Object.defineProperty(event, 'target', { value: select });
+        for (const listener of select.listeners.get('change') ?? []) listener(event);
+        const onChange = select.props.onChange;
+        assert.equal(typeof onChange, 'function');
+        if (typeof onChange === 'function') onChange(event);
+        assert.deepEqual(updates, ['red']);
+        assert.deepEqual(changes, [event]);
+    } finally { app.unmount(); }
 });

@@ -3,7 +3,7 @@
     import { TOOL_GROUPS, type ToolId } from '@/types/editor';
     import UndoIcon from '@/components/editor/icons/UndoIcon.vue';
     import RedoIcon from '@/components/editor/icons/RedoIcon.vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseIconButton } from 'chrome-extension-component-library';
     import { shortcutModifierLabel } from '@/lib/shortcuts';
     import EditorToolFoldout from './EditorToolFoldout.vue';
     import EditorToolButton from './EditorToolButton.vue';
@@ -72,26 +72,26 @@
                 <template v-if="historyCollapsed">
                     <div class="tool-group-popup-section" role="group" aria-label="Edit history">
                         <div class="tool-group tool-group--popup">
-                            <BaseButton
+                            <BaseIconButton
                                 variant="tool"
-                                aria-label="Undo"
+                                label="Undo"
                                 :title="`Undo last edit (${modifier}+Z)`"
                                 :disabled="!hasImage || busy || !canUndo"
                                 data-history-action="undo"
                                 @click="emit('undo')"
                             >
                                 <UndoIcon />
-                            </BaseButton>
-                            <BaseButton
+                            </BaseIconButton>
+                            <BaseIconButton
                                 variant="tool"
-                                aria-label="Redo"
+                                label="Redo"
                                 :title="`Redo last undone edit (${modifier}+Y or ${modifier}+Shift+Z)`"
                                 :disabled="!hasImage || busy || !canRedo"
                                 data-history-action="redo"
                                 @click="emit('redo')"
                             >
                                 <RedoIcon />
-                            </BaseButton>
+                            </BaseIconButton>
                         </div>
                     </div>
                     <hr

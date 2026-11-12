@@ -5,13 +5,12 @@ import test, { type TestContext } from 'node:test';
 import { createRenderer, markRaw, type Component } from 'vue';
 import { compileScript, parse } from 'vue/compiler-sfc';
 import { transpileModule, ModuleKind } from 'typescript';
-import { baseControlUrl } from '../../components/bascomponents/__tests__/loadBaseControl.ts';
 
 const source = await readFile(new URL('../../components/editor/dialogs/DiscardChangesDialog.vue', import.meta.url), 'utf8');
 const { descriptor } = parse(source);
 const script = compileScript(descriptor, { id: 'discard-dialog-test', inlineTemplate: true }).content;
 const compiled = transpileModule(script, { compilerOptions: { module: ModuleKind.ESNext } }).outputText
-    .replaceAll("'@/components/bascomponents/BaseButton.vue'", JSON.stringify(await baseControlUrl('BaseButton')))
+    .replaceAll("'chrome-extension-component-library'", JSON.stringify(import.meta.resolve('chrome-extension-component-library')))
     .replaceAll(/(['"])vue\1/g, JSON.stringify(import.meta.resolve('vue')));
 const { default: component }: { default: Component } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
     import { nextTick, onBeforeUnmount, ref, useId, useTemplateRef, watch } from 'vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseIconButton } from 'chrome-extension-component-library';
 
     defineProps<{
         label: string
@@ -13,13 +13,13 @@
     const VIEWPORT_MARGIN = 8;
     const panelId = useId();
     const root = useTemplateRef<HTMLDivElement>('root');
-    const toggleButton = useTemplateRef<InstanceType<typeof BaseButton>>('toggleButton');
+    const toggleButton = useTemplateRef<{ $el: HTMLButtonElement }>('toggleButton');
     const panel = useTemplateRef<HTMLDivElement>('panel');
     const panelStyle = ref<Record<string, string>>({});
 
     // Centers the panel on the toggle and clamps it to the viewport.
     async function positionPanel() {
-        const rect = toggleButton.value?.getBoundingClientRect();
+        const rect = toggleButton.value?.$el.getBoundingClientRect();
         if (!rect) return;
         const left = rect.right + PANEL_GAP;
         const maxWidth = `${Math.max(window.innerWidth - left - VIEWPORT_MARGIN, 0)}px`;
@@ -74,7 +74,7 @@
         if (event.key !== 'Escape' || !open.value) return;
         event.stopPropagation();
         open.value = false;
-        void nextTick(() => toggleButton.value?.focus());
+        void nextTick(() => toggleButton.value?.$el.focus());
     }
 
     function closeOnFocusLeave(event: FocusEvent) {
@@ -93,11 +93,11 @@
         @keydown="closeOnEscape"
         @focusout="closeOnFocusLeave"
     >
-        <BaseButton
+        <BaseIconButton
             ref="toggleButton"
             variant="tool"
             :class="{ 'is-active': active || open }"
-            :aria-label="label"
+            :label="label"
             :title="label"
             :aria-expanded="open"
             :aria-controls="panelId"
@@ -107,7 +107,7 @@
             <slot name="icon">
                 <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
             </slot>
-        </BaseButton>
+        </BaseIconButton>
         <div
             v-show="open"
             :id="panelId"

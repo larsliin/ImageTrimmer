@@ -1,19 +1,18 @@
 <script setup lang="ts">
     import { useAttrs, useTemplateRef } from 'vue';
-    import '@/assets/range-slider.css';
+    import { BaseRangeInput as LibraryRangeInput } from 'chrome-extension-component-library';
 
     const model = defineModel<number>();
     const attrs = useAttrs();
-    const input = useTemplateRef<HTMLInputElement>('input');
+    const input = useTemplateRef<InstanceType<typeof LibraryRangeInput>>('input');
 
     defineExpose({ focus: () => input.value?.focus() });
 
-    function updateValue(event: Event) {
-        if ('value' in attrs) return;
-        if (event.target instanceof HTMLInputElement) model.value = event.target.valueAsNumber;
+    function updateValue(value: number | undefined) {
+        if (!('value' in attrs)) model.value = value;
     }
 </script>
 
 <template>
-    <input ref="input" type="range" :value="model" @input="updateValue" />
+    <LibraryRangeInput ref="input" :model-value="model" @update:model-value="updateValue" />
 </template>

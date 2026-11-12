@@ -13,7 +13,7 @@
         type LevelsParams,
     } from '@/lib/levels';
     import ToolModal from '../dialogs/ToolModal.vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseButton } from 'chrome-extension-component-library';
     import BaseNumberInput from '@/components/bascomponents/BaseNumberInput.vue';
     import BaseCheckbox from '@/components/bascomponents/BaseCheckbox.vue';
 
@@ -337,7 +337,7 @@
     gap: 6px;
 }
 
-.preview-toggle input:focus-visible {
+.preview-toggle :deep(input:focus-visible) {
     outline: 1px solid var(--color-focus);
     outline-offset: 0;
 }

@@ -4,7 +4,7 @@
     import { MAX_RESIZE_DIMENSION, dimensionForPercentage, heightForWidth, isValidResize, widthForHeight } from '@/lib/resize';
     import type { Size } from '@/lib/zoom';
     import FloatingToolbar from '../chrome/FloatingToolbar.vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseIconButton } from 'chrome-extension-component-library';
     import BaseNumberInput from '@/components/bascomponents/BaseNumberInput.vue';
 
     const props = defineProps<{
@@ -125,23 +125,24 @@
                             min="0" step="0.1" required @input="onDimensionInput('height', 'percentage')" />
                     </label>
                     <div class="resize-actions">
-                        <BaseButton
-                            class="resize-button lock-button"
-                            :aria-pressed="lockRatio"
-                            :aria-label="lockRatio ? 'Aspect ratio locked' : 'Aspect ratio unlocked'"
+                        <BaseIconButton
+                            variant="secondary"
+                            class="resize-button"
+                            :active="lockRatio"
+                            :label="lockRatio ? 'Aspect ratio locked' : 'Aspect ratio unlocked'"
                             :title="lockRatio ? 'Unlock aspect ratio' : 'Lock aspect ratio'"
                             @click="toggleLock"
                         >
                             <i aria-hidden="true" class="bi" :class="lockRatio ? 'bi-lock-fill' : 'bi-unlock'"></i>
-                        </BaseButton>
+                        </BaseIconButton>
                         <span class="resize-divider" role="separator" aria-orientation="vertical"></span>
-                        <BaseButton type="submit" class="resize-button resize-button--apply" aria-label="Apply resize" title="Apply resize"
+                        <BaseIconButton variant="primary" type="submit" class="resize-button resize-button--apply" label="Apply resize" title="Apply resize"
                             :disabled="!valid || unchanged">
                             <i class="bi bi-check-lg" aria-hidden="true"></i>
-                        </BaseButton>
-                        <BaseButton class="resize-button" aria-label="Cancel resize" title="Cancel resize" @click="cancel">
+                        </BaseIconButton>
+                        <BaseIconButton variant="secondary" class="resize-button" label="Cancel resize" title="Cancel resize" @click="cancel">
                             <i class="bi bi-x-lg" aria-hidden="true"></i>
-                        </BaseButton>
+                        </BaseIconButton>
                     </div>
                 </fieldset>
                 <p v-if="!valid" class="validation-message" role="alert">
@@ -181,8 +182,9 @@
     font-size: 12px;
 }
 
-.dimension-input,
-.resize-button {
+.dimension-input {
+    width: 64px;
+    min-width: 0;
     height: 30px;
     padding: 4px 8px;
     color: var(--color-text);
@@ -190,15 +192,6 @@
     border: 1px solid var(--color-border);
     border-radius: 3px;
     font: inherit;
-}
-
-.dimension-input {
-    width: 64px;
-    min-width: 0;
-}
-
-.lock-button[aria-pressed='true'] {
-    border-color: var(--color-accent);
 }
 
 .dimension-input:focus-visible {
@@ -229,36 +222,12 @@
 
 .resize-button {
     width: 30px;
+    height: 30px;
     padding: 0;
-    background: var(--color-button-secondary);
-    border: 1px solid var(--color-button-secondary-border);
-    border-radius: var(--radius-button);
-    cursor: pointer;
 }
 
-.resize-button--apply {
-    color: #fff;
-    background: var(--color-accent);
-    border-color: transparent;
-}
-
-.resize-button:hover:not(:disabled) {
-    filter: brightness(1.15);
-}
-
-.resize-button:not(.resize-button--apply):hover:not(:disabled) {
-    background: var(--color-button-secondary-hover);
-    border-color: var(--color-button-secondary-border-hover);
-    filter: none;
-}
-
-.resize-button:disabled {
+.resize-button--apply:disabled {
     opacity: 0.4;
-    cursor: not-allowed;
-}
-
-.resize-button:not(.resize-button--apply):disabled {
-    opacity: var(--opacity-button-secondary-disabled);
 }
 
 .resize-button:focus-visible {

@@ -17,7 +17,7 @@
     } from '@/lib/curves';
     import { computeHistogram } from '@/lib/levels';
     import ToolModal from '../dialogs/ToolModal.vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseButton, BaseSelect } from 'chrome-extension-component-library';
     import BaseNumberInput from '@/components/bascomponents/BaseNumberInput.vue';
     import BaseCheckbox from '@/components/bascomponents/BaseCheckbox.vue';
 
@@ -40,6 +40,7 @@
 
     const curves = ref<CurvesParams>(defaultCurves());
     const channel = ref<CurvesChannel>('rgb');
+    const channelOptions = CURVES_CHANNELS.map(({ id, label }) => ({ value: id, label }));
     const showPreview = ref(true);
     const selectedByChannel = ref<Record<CurvesChannel, number>>({ rgb: 0, red: 0, green: 0, blue: 0 });
     const selected = computed({
@@ -236,15 +237,11 @@
         @cancel="cancel"
     >
         <div class="curves">
-            <label class="field field--channel" :for="`${idPrefix}-channel`">
-                Channel
-                <span class="channel-select">
-                    <select :id="`${idPrefix}-channel`" v-model="channel" class="field__input channel-select__input">
-                        <option v-for="item in CURVES_CHANNELS" :key="item.id" :value="item.id">{{ item.label }}</option>
-                    </select>
-                    <i class="bi bi-chevron-down channel-select__icon" aria-hidden="true"></i>
-                </span>
-            </label>
+            <div class="field field--channel">
+                <label :for="`${idPrefix}-channel`">Channel</label>
+                <BaseSelect :id="`${idPrefix}-channel`" v-model="channel" :options="channelOptions"
+                    class="field__input channel-select__input" />
+            </div>
 
             <svg
                 ref="graph"
@@ -407,30 +404,11 @@
     max-width: 50%;
 }
 
-.channel-select {
-    position: relative;
-}
-
-.channel-select .channel-select__input {
-    appearance: none;
-    padding-right: 32px;
-}
-
-.channel-select__icon {
-    position: absolute;
-    top: 50%;
-    right: 10px;
-    transform: translateY(-50%);
-    pointer-events: none;
-    color: var(--color-text);
-    font-size: 12px;
-}
-
-.channel-select__input {
+.field--channel :deep(.channel-select__input) {
     width: 100%;
     min-width: 0;
     min-height: 34px;
-    padding: 6px 10px;
+    padding: 6px 32px 6px 10px;
     color: var(--color-text);
     background: var(--color-bg);
     border: 1px solid var(--color-border);
@@ -438,8 +416,8 @@
     font: inherit;
 }
 
-.channel-select__input:focus-visible,
-.preview-toggle input:focus-visible {
+.field--channel :deep(.channel-select__input:focus-visible),
+.preview-toggle :deep(input:focus-visible) {
     outline: 1px solid var(--color-focus);
     outline-offset: 0;
 }

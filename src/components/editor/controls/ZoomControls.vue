@@ -1,7 +1,7 @@
 <script setup lang="ts">
     import { computed, ref, nextTick, watch } from 'vue';
     import { clampZoom, formatZoom, type Size } from '@/lib/zoom';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseIconButton } from 'chrome-extension-component-library';
 
     const props = defineProps<{
         zoom: number
@@ -83,26 +83,26 @@
             />
             <span class="zoom-input-suffix">%</span>
         </div>
-        <BaseButton
+        <BaseIconButton
             class="zoom-button"
-            aria-label="Fit to window"
+            label="Fit to window"
             title="Fit to window"
-            :aria-pressed="isFit"
+            :active="isFit"
             :disabled="disabled || isFit"
             @click="emit('fit')"
         >
             <i class="bi bi-arrows-angle-contract" aria-hidden="true"></i>
-        </BaseButton>
-        <BaseButton
+        </BaseIconButton>
+        <BaseIconButton
             class="zoom-button"
-            aria-label="Actual size (100%)"
+            label="Actual size (100%)"
             title="Actual size (100%)"
-            :aria-pressed="isActualSize"
+            :active="isActualSize"
             :disabled="disabled || isActualSize"
             @click="emit('actual-size')"
         >
             <span class="zoom-actual-size-icon" aria-hidden="true">1:1</span>
-        </BaseButton>
+        </BaseIconButton>
         <output
             v-if="imageSize"
             class="image-dimensions"
@@ -229,8 +229,8 @@
     display: grid;
     place-items: center;
     box-sizing: border-box;
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
     border: 1px solid currentColor;
     border-radius: 4px;
     color: inherit;

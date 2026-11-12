@@ -3,9 +3,10 @@
     import { MAX_STRAIGHTEN_ANGLE, type CropRect } from '@/lib/crop';
     import type { Size } from '@/lib/zoom';
     import FloatingToolbar from '../chrome/FloatingToolbar.vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseIconButton } from 'chrome-extension-component-library';
     import BaseRangeInput from '@/components/bascomponents/BaseRangeInput.vue';
     import BaseCheckbox from '@/components/bascomponents/BaseCheckbox.vue';
+    import BaseNumberInput from '@/components/bascomponents/BaseNumberInput.vue';
 
     const props = defineProps<{
         image: Size
@@ -58,14 +59,14 @@
             >
                 <fieldset :disabled="disabled || dragging">
                     <div class="crop-fields">
-                        <label>X <input v-model.number="cropX" aria-label="Crop X" type="number" min="0"
+                        <label>X <BaseNumberInput v-model.number="cropX" aria-label="Crop X" min="0"
                             :max="image.width - 1" required :step="snapToPixel ? 1 : 'any'" @blur="zeroIfEmpty($event, 'x')" /></label>
-                        <label>Y <input v-model.number="cropY" aria-label="Crop Y" type="number" min="0"
+                        <label>Y <BaseNumberInput v-model.number="cropY" aria-label="Crop Y" min="0"
                             :max="image.height - 1" required :step="snapToPixel ? 1 : 'any'" @blur="zeroIfEmpty($event, 'y')" /></label>
-                        <label>Width <input v-model.number="cropWidth" aria-label="Crop width" type="number" min="1"
+                        <label>Width <BaseNumberInput v-model.number="cropWidth" aria-label="Crop width" min="1"
                             :max="displayDimension(image.width - crop.x)" required :step="snapToPixel ? 1 : 'any'"
                             @blur="zeroIfEmpty($event, 'width')" /></label>
-                        <label>Height <input v-model.number="cropHeight" aria-label="Crop height" type="number" min="1"
+                        <label>Height <BaseNumberInput v-model.number="cropHeight" aria-label="Crop height" min="1"
                             :max="displayDimension(image.height - crop.y)" required :step="snapToPixel ? 1 : 'any'"
                             @blur="zeroIfEmpty($event, 'height')" /></label>
                         <label class="crop-snap">
@@ -81,11 +82,11 @@
                             <BaseRangeInput v-model.number="angle" class="crop-angle-range" aria-label="Straighten angle slider"
                                 :min="-MAX_STRAIGHTEN_ANGLE" :max="MAX_STRAIGHTEN_ANGLE" step="0.1" />
                         </label>
-                        <label><input v-model.number="angle" aria-label="Straighten angle in degrees" type="number"
+                        <label><BaseNumberInput v-model.number="angle" aria-label="Straighten angle in degrees"
                             :min="-MAX_STRAIGHTEN_ANGLE" :max="MAX_STRAIGHTEN_ANGLE" step="0.1" required @blur="zeroIfEmpty($event, 'angle')" /> deg</label>
-                        <BaseButton class="icon-button" aria-label="Reset angle" title="Reset angle" :disabled="angle === 0" @click="angle = 0">
+                        <BaseIconButton variant="secondary" class="icon-button" label="Reset angle" title="Reset angle" :disabled="angle === 0" @click="angle = 0">
                             <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
-                        </BaseButton>
+                        </BaseIconButton>
                     </div>
                     <p v-if="!valid && !dragging" class="crop-error" role="alert"
                         :title="`Enter a non-empty crop inside the image bounds and an angle within ±${MAX_STRAIGHTEN_ANGLE}°.`">
@@ -93,12 +94,12 @@
                     </p>
                     <div class="crop-actions">
                         <span class="crop-divider" role="separator" aria-orientation="vertical"></span>
-                        <BaseButton type="submit" class="icon-button" aria-label="Apply crop" title="Apply crop" :disabled="!valid || unchanged">
+                        <BaseIconButton variant="primary" type="submit" class="icon-button" label="Apply crop" title="Apply crop" :disabled="!valid || unchanged">
                             <i class="bi bi-check-lg" aria-hidden="true"></i>
-                        </BaseButton>
-                        <BaseButton class="icon-button" aria-label="Cancel crop" title="Cancel crop" @click="emit('cancel')">
+                        </BaseIconButton>
+                        <BaseIconButton variant="secondary" class="icon-button" label="Cancel crop" title="Cancel crop" @click="emit('cancel')">
                             <i class="bi bi-x-lg" aria-hidden="true"></i>
-                        </BaseButton>
+                        </BaseIconButton>
                     </div>
                 </fieldset>
             </form>
@@ -166,8 +167,7 @@ label {
     font-size: 12px;
 }
 
-input,
-button {
+.crop-fields input {
     height: 30px;
     padding: 4px 8px;
     color: var(--color-text);
@@ -189,7 +189,7 @@ input[type='number'] {
     width: 78px;
 }
 
-input[type='checkbox'] {
+.crop-controls :deep(input[type='checkbox']) {
     width: 16px;
     height: 16px;
     margin: 0;
@@ -197,32 +197,10 @@ input[type='checkbox'] {
     accent-color: var(--color-accent);
 }
 
-button {
-    cursor: pointer;
-}
-
-.crop-controls button {
-    border-radius: var(--radius-button);
-}
-
-.crop-controls button[type='button'] {
-    background: var(--color-button-secondary);
-    border-color: var(--color-button-secondary-border);
-}
-
-.crop-controls button[type='button']:hover:not(:disabled) {
-    background: var(--color-button-secondary-hover);
-    border-color: var(--color-button-secondary-border-hover);
-}
-
-.icon-button {
+.crop-controls .icon-button {
     width: 30px;
+    height: 30px;
     padding: 0;
-}
-
-button[type='submit'] {
-    background: var(--color-accent);
-    color: #fff;
 }
 
 @media (max-width: 1400px) {
@@ -235,13 +213,12 @@ button[type='submit'] {
     }
 }
 
-button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+.crop-controls .icon-button:disabled {
+    opacity: var(--opacity-button-secondary-disabled);
 }
 
-.crop-controls button[type='button']:disabled {
-    opacity: var(--opacity-button-secondary-disabled);
+.crop-controls .icon-button.primary-button:disabled {
+    opacity: 0.4;
 }
 
 input:focus-visible {
@@ -249,7 +226,7 @@ input:focus-visible {
     outline-offset: 0;
 }
 
-button:focus-visible {
+.crop-controls .icon-button:focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: -2px;
 }

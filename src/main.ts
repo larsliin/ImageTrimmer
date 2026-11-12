@@ -1,4 +1,4 @@
-import 'bootstrap-icons/font/bootstrap-icons.css';
+import 'chrome-extension-component-library/style.css';
 import './assets/main.css';
 
 import { createApp } from 'vue';

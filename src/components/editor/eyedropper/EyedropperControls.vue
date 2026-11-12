@@ -1,6 +1,6 @@
 <script setup lang="ts">
     import { onBeforeUnmount, shallowRef, watch } from 'vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseIconButton } from 'chrome-extension-component-library';
     import FloatingToolbar from '@/components/editor/chrome/FloatingToolbar.vue';
     import type { EyedropperSelection } from '@/lib/eyedropper';
 
@@ -89,10 +89,10 @@
                         @click="selectHex"
                     >{{ selection?.hex ?? '' }}</span>
                 </div>
-                <BaseButton
+                <BaseIconButton
                     variant="secondary"
                     class="eyedropper-controls__button"
-                    aria-label="Copy sampled color"
+                    label="Copy sampled color"
                     :disabled="!selection || disabled"
                     @click="copySelection"
                 >
@@ -104,17 +104,17 @@
                         aria-hidden="true"
                     ></i>
                     <span class="eyedropper-controls__tooltip" aria-hidden="true">Copy sampled color</span>
-                </BaseButton>
-                <BaseButton
+                </BaseIconButton>
+                <BaseIconButton
                     variant="secondary"
                     class="eyedropper-controls__button"
-                    aria-label="Close eyedropper"
+                    label="Close eyedropper"
                     :disabled="disabled"
                     @click="emit('close')"
                 >
                     <i class="bi bi-x-lg" aria-hidden="true"></i>
                     <span class="eyedropper-controls__tooltip" aria-hidden="true">Close eyedropper</span>
-                </BaseButton>
+                </BaseIconButton>
                 <span class="eyedropper-controls__status" role="status" aria-live="polite" aria-atomic="true">
                     {{ status }}
                 </span>
@@ -177,10 +177,7 @@
 
 .eyedropper-controls__button {
     position: relative;
-    display: grid;
     flex: 0 0 30px;
-    align-items: center;
-    justify-content: center;
     width: 30px;
     height: 30px;
     padding: 0;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
     import { nextTick, onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
     import FloatingToolbar from '../chrome/FloatingToolbar.vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseIconButton } from 'chrome-extension-component-library';
     import BaseNumberInput from '@/components/bascomponents/BaseNumberInput.vue';
     import BaseRangeInput from '@/components/bascomponents/BaseRangeInput.vue';
     import { isValidBrushSettings, type BrushSettings } from '@/lib/brush';
@@ -95,14 +95,14 @@
                         <output>{{ settings.color.toUpperCase() }}</output>
                     </label>
                     <span class="brush-controls__divider" role="separator" aria-orientation="vertical"></span>
-                    <BaseButton type="submit" class="brush-controls__action brush-controls__action--apply"
-                        aria-label="Apply brush strokes" title="Apply brush strokes" :disabled="!canApply">
+                    <BaseIconButton variant="primary" type="submit" class="brush-controls__action"
+                        label="Apply brush strokes" title="Apply brush strokes" :disabled="!canApply">
                         <i class="bi bi-check-lg" aria-hidden="true"></i>
-                    </BaseButton>
-                    <BaseButton class="brush-controls__action" aria-label="Cancel brush strokes"
+                    </BaseIconButton>
+                    <BaseIconButton variant="secondary" class="brush-controls__action" label="Cancel brush strokes"
                         title="Cancel brush strokes" @click="emit('cancel')">
                         <i class="bi bi-x-lg" aria-hidden="true"></i>
-                    </BaseButton>
+                    </BaseIconButton>
                 </fieldset>
                 <p v-if="error" class="brush-controls__error" role="alert">{{ error }}</p>
                 <p v-if="disabled" class="brush-controls__status" role="status">Processing image...</p>
@@ -209,16 +209,6 @@
     width: 30px;
     height: 30px;
     padding: 0;
-    color: var(--color-text);
-    background: var(--color-button-secondary);
-    border: 1px solid var(--color-button-secondary-border);
-    border-radius: var(--radius-button);
-}
-
-.brush-controls__action--apply {
-    color: #fff;
-    background: var(--color-accent);
-    border-color: var(--color-accent);
 }
 
 .brush-controls__action:focus-visible,

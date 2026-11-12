@@ -42,6 +42,16 @@ or backend services unless explicitly requested.
 - Keep TypeScript types explicit at image-processing boundaries; avoid `any`.
 - Use the existing Vite setup and npm scripts. Prefer browser APIs for image
   processing; add dependencies only when they provide a clear benefit.
+- Prefer equivalent controls from `chrome-extension-component-library`
+  (`github:larsliin/ChromeExtensionsComponentLibrary#main`) over new local
+  primitives. Use BaseButton for text actions and BaseIconButton for icon
+  actions/toggles with accessible labels and optional pressed state. Import
+  library CSS only in `src/main.ts`, before app CSS; it includes Bootstrap Icons.
+  Keep app-specific validation/parsing, layout/tokens, theme persistence,
+  dialogs, focus/keyboard workflows and image processing in ImageTrimmer.
+  Reuse the thin local field adapters when native attribute forwarding or
+  controlled value/change timing requires them. Retain custom editor UI
+  without an exact shared equivalent; do not duplicate shared primitive logic.
 - Separate image transformations and coordinate calculations from UI
   components so they can be tested independently.
 - Process images locally in the browser by default. Do not upload images or

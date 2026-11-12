@@ -2,12 +2,11 @@ import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import { readFile } from 'node:fs/promises';
 import test, { type TestContext } from 'node:test';
-import { createRenderer, markRaw, type Component } from 'vue';
+import { createRenderer, markRaw, nextTick, type Component } from 'vue';
 import { compileScript, parse } from 'vue/compiler-sfc';
 import { transpileModule, ModuleKind } from 'typescript';
 import type { ImageInfo } from '@/types/editor';
 import type { ThemeMode } from '@/lib/theme';
-import { baseControlUrl } from '../../../bascomponents/__tests__/loadBaseControl.ts';
 
 // This parameter is part of the callback type and is intentionally not referenced here.
 // eslint-disable-next-line no-unused-vars
@@ -15,6 +14,9 @@ type TestEventListener = (event: Event) => void;
 
 class TestDocument {
     activeElement: TestElement | null = null;
+    readonly listeners = new Map<string, TestEventListener>();
+    addEventListener(type: string, listener: TestEventListener) { this.listeners.set(type, listener); }
+    removeEventListener(type: string) { this.listeners.delete(type); }
 }
 Object.defineProperty(globalThis, 'Document', {
     configurable: true,
@@ -65,6 +67,11 @@ class TestElement {
 
     focus() {
         this.focusCount += 1;
+        testDocument.activeElement = this;
+    }
+
+    contains(target: TestElement): boolean {
+        return this === target || this.children.some((child) => child.contains(target));
     }
 
     setSelectionRange(start: number, end: number) {
@@ -82,28 +89,23 @@ class TestElement {
 }
 
 class TestSelectElement extends TestElement {}
+const testDocument = new TestDocument();
+Object.defineProperty(globalThis, 'document', { configurable: true, value: testDocument });
+Object.defineProperty(globalThis, 'window', {
+    configurable: true,
+    value: { innerWidth: 1280, innerHeight: 800, addEventListener() {}, removeEventListener() {} },
+});
+Object.defineProperty(globalThis, 'Node', { configurable: true, value: TestElement });
 Object.defineProperty(globalThis, 'HTMLSelectElement', {
     configurable: true,
     value: TestSelectElement,
 });
 
 const source = await readFile(new URL('../EditorTopBar.vue', import.meta.url), 'utf8');
-const dropdownSource = await readFile(new URL('../../../shared/DropdownSelect.vue', import.meta.url), 'utf8');
-const dropdownScript = compileScript(parse(dropdownSource).descriptor, {
-    id: 'dropdown-select-test',
-    inlineTemplate: true,
-}).content;
-const dropdownCompiled = transpileModule(dropdownScript, {
-    compilerOptions: { module: ModuleKind.ESNext },
-}).outputText
-    .replaceAll("'vue'", JSON.stringify(import.meta.resolve('vue')))
-    .replaceAll('"vue"', JSON.stringify(import.meta.resolve('vue')));
-const dropdownUrl = `data:text/javascript;base64,${Buffer.from(dropdownCompiled).toString('base64')}`;
 const { descriptor } = parse(source);
 const script = compileScript(descriptor, { id: 'editor-top-bar-test', inlineTemplate: true }).content;
 const compiled = transpileModule(script, { compilerOptions: { module: ModuleKind.ESNext } }).outputText
-    .replaceAll("'@/components/bascomponents/BaseButton.vue'", JSON.stringify(await baseControlUrl('BaseButton')))
-    .replaceAll("'@/components/shared/DropdownSelect.vue'", JSON.stringify(dropdownUrl))
+    .replaceAll("'chrome-extension-component-library'", JSON.stringify(import.meta.resolve('chrome-extension-component-library')))
     .replaceAll("'vue'", JSON.stringify(import.meta.resolve('vue')))
     .replaceAll('"vue"', JSON.stringify(import.meta.resolve('vue')));
 const { default: editorTopBar }: { default: Component } = await import(
@@ -195,12 +197,17 @@ function mountTopBar(
 
 function findElement(root: TestElement, property: string, value: string): TestElement | null {
     const actual = property === 'type' ? root.type : root.props[property];
-    if (actual === value) return root;
+    if (actual === value || (property === 'aria-label' && root.props.role === 'radio'
+        && textContent(root) === value)) return root;
     for (const child of root.children) {
         const match = findElement(child, property, value);
         if (match) return match;
     }
     return null;
+}
+
+function textContent(element: TestElement): string {
+    return element.text + element.children.map(textContent).join('');
 }
 
 function getFilenameInput(root: TestElement): TestElement {
@@ -508,11 +515,16 @@ test('shows the full filename including extension when not editing', (t) => {
         height: 600,
         exportMimeType: 'image/png',
     });
+    assert.match(source, /import \{[^}]*BaseButton[^}]*\} from 'chrome-extension-component-library'/);
+    assert.match(source, /<BaseButton\s+v-if="!isEditing"[\s\S]*?variant="bare"/);
     assert.equal(renameButton.type, 'button');
     assert.equal(renameButton.props['aria-label'], 'Rename original.png');
+    assert.equal(renameButton.props.title, 'original.png');
     assert.equal(findElement(root, 'class', 'filename-base-text')?.text, 'original');
     assert.equal(findElement(root, 'type', 'select'), null);
     assert.equal(findElement(root, 'class', 'filename-extension')?.text, '.png');
+    assert.equal(hasClass(renameButton, 'filename-control'), true);
+    assert.equal(hasClass(renameButton, 'filename-control--action'), true);
 });
 
 test('opens the theme picker and selects Light, Dark, or Auto mode', async (t) => {
@@ -560,4 +572,34 @@ test('opens the theme picker and selects Light, Dark, or Auto mode', async (t) =
     const darkThemeButton = findElement(darkMode.root, 'aria-label', 'Theme: Dark mode');
     assert.ok(darkThemeButton);
     assert.ok(findElement(darkThemeButton, 'class', 'bi bi-moon'));
+});
+
+test('theme menu supports Home/End, focus leave, outside click and listener cleanup', async (t) => {
+    const { emitted, root } = mountTopBar(t, null);
+    const trigger = findElement(root, 'aria-label', 'Theme: Light mode');
+    assert.ok(trigger?.parent);
+    await invokeHandler(trigger, 'onClick', new Event('click'));
+    const light = findElement(root, 'aria-label', 'Light mode');
+    assert.ok(light);
+    assert.equal(testDocument.activeElement, light);
+    await invokeHandler(light, 'onKeydown', keyboardEvent('End'));
+    assert.deepEqual(emitted.at(-1), { name: 'select-theme', value: 'auto' });
+    const auto = findElement(root, 'aria-label', 'Auto');
+    assert.ok(auto);
+    assert.equal(testDocument.activeElement, auto);
+    await invokeHandler(auto, 'onKeydown', keyboardEvent('Home'));
+    assert.deepEqual(emitted.at(-1), { name: 'select-theme', value: 'light' });
+    const outside = new TestElement('button');
+    const focusout = new Event('focusout');
+    Object.defineProperty(focusout, 'relatedTarget', { value: outside });
+    await invokeHandler(trigger.parent, 'onFocusout', focusout);
+    assert.equal(trigger.props['aria-expanded'], false);
+    assert.equal(testDocument.listeners.has('pointerdown'), false);
+    await invokeHandler(trigger, 'onClick', new Event('click'));
+    const pointerdown = new Event('pointerdown');
+    Object.defineProperty(pointerdown, 'target', { value: outside });
+    testDocument.listeners.get('pointerdown')?.(pointerdown);
+    await nextTick();
+    assert.equal(trigger.props['aria-expanded'], false);
+    assert.equal(testDocument.listeners.has('pointerdown'), false);
 });

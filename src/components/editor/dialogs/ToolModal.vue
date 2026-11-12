@@ -3,7 +3,7 @@
     import { useDragOffset } from '@/composables/useDragOffset';
     import type { Point } from '@/lib/crop';
     import { clampGripOffset } from '@/lib/drag';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseButton } from 'chrome-extension-component-library';
 
     const props = withDefaults(defineProps<{
         title: string
@@ -141,8 +141,8 @@
                 <p v-if="error" class="tool-modal__error" role="alert">{{ error }}</p>
                 <p v-if="busy" class="tool-modal__status" role="status">Processing image...</p>
                 <footer class="tool-modal__actions">
-                    <BaseButton class="tool-modal__button" :disabled="busy" @click="cancel">Cancel</BaseButton>
-                    <BaseButton type="submit" class="tool-modal__button tool-modal__button--apply" :disabled="busy || !canApply">
+                    <BaseButton variant="bare" class="tool-modal__button" :disabled="busy" @click="cancel">Cancel</BaseButton>
+                    <BaseButton variant="bare" type="submit" class="tool-modal__button tool-modal__button--apply" :disabled="busy || !canApply">
                         {{ applyLabel }}
                     </BaseButton>
                 </footer>

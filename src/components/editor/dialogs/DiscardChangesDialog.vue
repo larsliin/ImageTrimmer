@@ -1,6 +1,6 @@
 <script setup lang="ts">
     import { onBeforeUnmount, onMounted, useId, useTemplateRef } from 'vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseButton } from 'chrome-extension-component-library';
 
     defineProps<{ toolName: string }>();
     const emit = defineEmits<{ keep: [], discard: [] }>();

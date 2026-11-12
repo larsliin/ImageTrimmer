@@ -148,19 +148,19 @@
     user-select: none;
 }
 
-.checkbox {
+.checkbox-label :deep(.checkbox) {
     width: 16px;
     height: 16px;
     cursor: pointer;
     accent-color: var(--color-accent);
 }
 
-.checkbox:focus-visible {
+.checkbox-label :deep(.checkbox:focus-visible) {
     outline: 2px solid var(--color-focus);
     outline-offset: 1px;
 }
 
-.checkbox:disabled {
+.checkbox-label :deep(.checkbox:disabled) {
     cursor: not-allowed;
     opacity: var(--opacity-input-disabled);
 }

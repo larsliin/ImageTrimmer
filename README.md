@@ -24,9 +24,19 @@ keyboard shortcuts, exporting, and tips for using the editor in narrow windows.
 ## Tech stack
 
 - Vue 3 and TypeScript
+- Shared Vue controls from `github:larsliin/ChromeExtensionsComponentLibrary#main`
 - Vite
 - Browser image APIs, including `ImageBitmap` and Canvas 2D
 - Node.js built-in test runner, ESLint, and Stylelint
+
+Prefer `chrome-extension-component-library` for equivalent buttons, form
+controls, selects, and alerts. Its stylesheet (including Bootstrap Icons) is
+loaded once in `src/main.ts`, before app styles. ImageTrimmer owns theme
+persistence, editor layout/tokens, validation, focus workflows, dialogs, and
+image processing. The local checkbox/number/range adapters only preserve
+native attribute routing, controlled-value timing, and app sizing where the
+library API differs; they do not duplicate primitive behavior. Keep custom
+editor controls when there is no exact shared equivalent.
 
 ## Requirements
 

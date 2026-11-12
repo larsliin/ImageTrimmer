@@ -3,7 +3,7 @@
     import { nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue';
     import type { QuarterTurns } from '@/lib/rotate';
     import FloatingToolbar from '../chrome/FloatingToolbar.vue';
-    import BaseButton from '@/components/bascomponents/BaseButton.vue';
+    import { BaseIconButton } from 'chrome-extension-component-library';
 
     const props = defineProps<{
         disabled: boolean
@@ -22,12 +22,12 @@
     const flipV = shallowRef(false);
     useToolDraft(() => ({ tool: 'rotate', turns: turns.value, flipH: flipH.value, flipV: flipV.value }), value => emit('dirty', value));
 
-    const clockwise = useTemplateRef<InstanceType<typeof BaseButton>>('clockwise');
+    const clockwise = useTemplateRef<{ $el: HTMLButtonElement }>('clockwise');
     let previousFocus: HTMLElement | null = null;
 
     onMounted(() => {
         previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        clockwise.value?.focus();
+        clockwise.value?.$el.focus();
     });
 
     onBeforeUnmount(() => {
@@ -69,31 +69,31 @@
         <FloatingToolbar label="Rotate toolbar" @keydown.esc.stop.prevent="cancel">
             <form class="rotate-form" aria-label="Rotate image" :aria-busy="disabled" @submit.prevent="apply">
                 <fieldset class="rotate-controls" :disabled="disabled">
-                    <BaseButton ref="clockwise" class="icon-button" aria-label="Rotate clockwise"
+                    <BaseIconButton variant="secondary" ref="clockwise" class="icon-button" label="Rotate clockwise"
                         title="Rotate 90 degrees clockwise" @click="rotate(1)">
                         <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
-                    </BaseButton>
-                    <BaseButton class="icon-button" aria-label="Rotate counterclockwise"
+                    </BaseIconButton>
+                    <BaseIconButton variant="secondary" class="icon-button" label="Rotate counterclockwise"
                         title="Rotate 90 degrees counterclockwise" @click="rotate(-1)">
                         <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
-                    </BaseButton>
+                    </BaseIconButton>
                     <span class="rotate-divider" role="separator" aria-orientation="vertical"></span>
-                    <BaseButton class="icon-button" :class="{ active: flipH }" aria-label="Flip horizontally"
+                    <BaseIconButton variant="secondary" class="icon-button" :active="flipH" label="Flip horizontally"
                         title="Flip image horizontally (mirror left-right)" @click="toggleFlipH">
                         <i class="bi bi-symmetry-horizontal" aria-hidden="true"></i>
-                    </BaseButton>
-                    <BaseButton class="icon-button" :class="{ active: flipV }" aria-label="Flip vertically"
+                    </BaseIconButton>
+                    <BaseIconButton variant="secondary" class="icon-button" :active="flipV" label="Flip vertically"
                         title="Flip image vertically (mirror top-bottom)" @click="toggleFlipV">
                         <i class="bi bi-symmetry-vertical" aria-hidden="true"></i>
-                    </BaseButton>
+                    </BaseIconButton>
                     <span class="rotate-divider" role="separator" aria-orientation="vertical"></span>
-                    <BaseButton type="submit" class="icon-button icon-button--apply" aria-label="Apply rotation"
+                    <BaseIconButton variant="primary" type="submit" class="icon-button" label="Apply rotation"
                         title="Apply rotation" :disabled="turns === 0 && !flipH && !flipV">
                         <i class="bi bi-check-lg" aria-hidden="true"></i>
-                    </BaseButton>
-                    <BaseButton class="icon-button" aria-label="Cancel rotation" title="Cancel rotation" @click="cancel">
+                    </BaseIconButton>
+                    <BaseIconButton variant="secondary" class="icon-button" label="Cancel rotation" title="Cancel rotation" @click="cancel">
                         <i class="bi bi-x-lg" aria-hidden="true"></i>
-                    </BaseButton>
+                    </BaseIconButton>
                 </fieldset>
                 <p v-if="error" class="rotate-error" role="alert">{{ error }}</p>
                 <p v-if="disabled" class="rotate-status" role="status">Processing image...</p>
@@ -127,38 +127,13 @@
     width: 30px;
     height: 30px;
     padding: 0;
-    color: var(--color-text);
-    background: var(--color-button-secondary);
-    border: 1px solid var(--color-button-secondary-border);
-    border-radius: var(--radius-button);
-    font: inherit;
-    cursor: pointer;
 }
 
-.icon-button.active {
+.icon-button.secondary-button.is-active:not(:disabled),
+.icon-button.secondary-button.is-active:hover:not(:disabled) {
     background: var(--color-accent);
     border-color: var(--color-accent);
     color: #fff;
-}
-
-.icon-button--apply {
-    color: #fff;
-    background: var(--color-accent);
-}
-
-.icon-button:hover:not(:disabled) {
-    filter: brightness(1.15);
-}
-
-.icon-button:not(.icon-button--apply):not(.active):hover:not(:disabled) {
-    background: var(--color-button-secondary-hover);
-    border-color: var(--color-button-secondary-border-hover);
-    filter: none;
-}
-
-.icon-button:disabled {
-    opacity: var(--opacity-button-secondary-disabled);
-    cursor: not-allowed;
 }
 
 .icon-button:focus-visible {
