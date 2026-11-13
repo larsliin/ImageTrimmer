@@ -293,6 +293,17 @@
 .controls-group :deep(.menu-select__trigger) {
     width: 22px;
     height: 24px;
+    padding: 0 2px;
+    color: var(--color-text-muted);
+    background-color: transparent;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.75rem;
+}
+
+.controls-group :deep(.menu-select__trigger:hover:not(:disabled)) {
+    color: var(--color-text);
+    background-color: var(--color-hover);
 }
 
 .controls-group :deep(.menu-select__trigger:focus-visible) {
