@@ -1,7 +1,7 @@
 <script setup lang="ts">
     import { computed, nextTick, shallowRef, useTemplateRef } from 'vue';
     import type { ImageInfo } from '@/types/editor';
-    import { BaseButton, BaseIconButton, BaseMenuSelect, type SelectOption } from 'chrome-extension-component-library';
+    import { BaseButton, BaseIconButton, BaseToggleGroup, type BaseToggleGroupAction } from 'chrome-extension-component-library';
     import type { ThemeMode } from '@/lib/theme';
 
     const props = defineProps<{
@@ -27,15 +27,58 @@
     const suppressFilenameFocusRing = shallowRef(false);
     const filenameAction = useTemplateRef<InstanceType<typeof BaseButton>>('filenameAction');
     const filenameInput = useTemplateRef<HTMLInputElement>('filenameInput');
-    const themeOptions: SelectOption<ThemeMode>[] = [
-        { value: 'light', label: 'Light mode' }, { value: 'dark', label: 'Dark mode' }, { value: 'auto', label: 'Auto' },
-    ];
-
-    const selectedTheme = computed({
-        get: () => props.themeMode,
-        set: (mode: ThemeMode) => emit('select-theme', mode),
-    });
+    const themeModes: ThemeMode[] = ['light', 'dark', 'auto'];
     const themeIcons: Record<ThemeMode, string> = { light: 'bi-sun', dark: 'bi-moon', auto: 'bi-circle-half' };
+    const themeLabels: Record<ThemeMode, string> = { light: 'Light mode', dark: 'Dark mode', auto: 'Auto' };
+
+    const controlsGroupActions = computed<readonly BaseToggleGroupAction[]>(() => [
+        {
+            id: 'rulers',
+            label: 'Pixel rulers',
+            icon: 'bi-rulers',
+            title: props.rulersEnabled ? 'Hide pixel rulers' : 'Show pixel rulers',
+            active: props.rulersEnabled,
+            disabled: props.busy || !props.image,
+        },
+        {
+            id: 'navigation-animations',
+            label: 'Animated zoom and pan',
+            icon: 'bi-wind',
+            title: props.prefersReducedMotion
+                ? 'Animated zoom and pan are disabled by your system reduced-motion setting'
+                : props.navigationAnimationsEnabled
+                    ? 'Disable animated zoom and pan for better performance'
+                    : 'Enable animated zoom and pan',
+            active: props.navigationAnimationsEnabled,
+            disabled: props.prefersReducedMotion,
+        },
+        {
+            id: 'theme',
+            label: 'Theme',
+            icon: props.isDarkMode ? 'bi-moon' : 'bi-sun',
+            title: `Theme: ${themeLabels[props.themeMode]}`,
+            subActions: themeModes.map((mode) => ({
+                id: mode,
+                label: themeLabels[mode],
+                icon: themeIcons[mode],
+                active: props.themeMode === mode,
+            })),
+        },
+    ]);
+
+    function handleControlsGroupAction(actionId: string, parentId?: string) {
+        if (parentId === 'theme') {
+            emit('select-theme', actionId as ThemeMode);
+            return;
+        }
+        if (actionId === 'rulers') emit('toggle-rulers');
+        else if (actionId === 'navigation-animations') emit('toggle-navigation-animations');
+        else if (actionId === 'theme') {
+            // Clicking the main icon (rather than opening the submenu) cycles to the next theme.
+            const nextIndex = (themeModes.indexOf(props.themeMode) + 1) % themeModes.length;
+            emit('select-theme', themeModes[nextIndex]!);
+        }
+    }
 
     const fileName = computed(() => props.image?.fileName ?? 'No image');
     const fileNameBase = computed(() => {
@@ -145,46 +188,12 @@
                 </dd>
             </div>
         </dl>
-        <div class="controls-group">
-            <BaseIconButton
-                class="rulers-toggle"
-                label="Pixel rulers"
-                :active="rulersEnabled"
-                :title="rulersEnabled ? 'Hide pixel rulers' : 'Show pixel rulers'"
-                :disabled="busy || !image"
-                @click="emit('toggle-rulers')"
-            >
-                <i class="bi bi-rulers" aria-hidden="true"></i>
-            </BaseIconButton>
-            <BaseIconButton
-                class="navigation-animation-toggle"
-                label="Animated zoom and pan"
-                :active="navigationAnimationsEnabled"
-                :title="prefersReducedMotion
-                    ? 'Animated zoom and pan are disabled by your system reduced-motion setting'
-                    : navigationAnimationsEnabled
-                        ? 'Disable animated zoom and pan for better performance'
-                        : 'Enable animated zoom and pan'"
-                :disabled="prefersReducedMotion"
-                @click="emit('toggle-navigation-animations')"
-            >
-                <i class="bi bi-wind" aria-hidden="true"></i>
-            </BaseIconButton>
-            <BaseMenuSelect
-                class="theme-picker"
-                label="Theme"
-                v-model="selectedTheme"
-                :options="themeOptions"
-            >
-                <template #default>
-                    <i :class="isDarkMode ? 'bi bi-moon' : 'bi bi-sun'" aria-hidden="true"></i>
-                </template>
-                <template #option="{ option }">
-                    <i class="bi" :class="themeIcons[option.value]" aria-hidden="true"></i>
-                    <span>{{ option.label }}</span>
-                </template>
-            </BaseMenuSelect>
-        </div>
+        <BaseToggleGroup
+            class="controls-group"
+            label="View options"
+            :actions="controlsGroupActions"
+            @action="handleControlsGroupAction"
+        />
         <BaseIconButton
             class="close-button"
             label="Close image"
@@ -234,11 +243,8 @@
 }
 
 .controls-group {
-    display: flex;
-    align-items: center;
-    gap: 2px;
+    gap: 4px;
     padding: 3px 4px;
-    height: 32px;
     background-color: var(--color-panel-raised);
     border: 1px solid var(--color-border);
     border-radius: 6px;
@@ -246,66 +252,47 @@
     margin-right: 12px;
 }
 
-.controls-group .rulers-toggle,
-.controls-group .navigation-animation-toggle {
-    display: grid;
-    flex: 0 0 auto;
-    place-items: center;
-    margin: 0;
-    padding: 0;
+.controls-group :deep(.tool-button) {
     width: 24px;
     height: 24px;
-    background-color: transparent;
-    border: none;
+    font-size: 0.75rem;
     border-radius: 4px;
     color: var(--color-text-muted);
-    font-size: 0.75rem;
 }
 
-.rulers-toggle .bi-rulers::before,
-.navigation-animation-toggle .bi-wind::before {
+.controls-group :deep(.bi-rulers::before),
+.controls-group :deep(.bi-wind::before) {
     display: block;
     transform: translateY(1px);
 }
 
-.controls-group .rulers-toggle:hover:not(:disabled),
-.controls-group .navigation-animation-toggle:hover:not(:disabled) {
+.controls-group :deep(.tool-button:hover:not(:disabled)) {
     color: var(--color-text);
     background-color: var(--color-hover);
 }
 
-.controls-group .rulers-toggle:focus-visible,
-.controls-group .navigation-animation-toggle:focus-visible {
+.controls-group :deep(.tool-button:focus-visible) {
     outline: 1px solid var(--color-focus);
     outline-offset: -3px;
 }
 
-.controls-group .rulers-toggle[aria-pressed='true']:not(:disabled),
-.controls-group .navigation-animation-toggle[aria-pressed='true']:not(:disabled) {
+.controls-group :deep(.tool-button.is-active:not(:disabled)) {
     color: var(--color-text);
     background-color: var(--color-active);
 }
 
-.controls-group .rulers-toggle:active:not(:disabled),
-.controls-group .navigation-animation-toggle:active:not(:disabled) {
+.controls-group :deep(.tool-button:active:not(:disabled)) {
     box-shadow: inset 0 0 0 1px var(--color-border);
 }
 
-.controls-group .rulers-toggle:disabled,
-.controls-group .navigation-animation-toggle:disabled {
+.controls-group :deep(.tool-button:disabled) {
     opacity: var(--opacity-button-secondary-disabled);
     cursor: default;
 }
 
 .controls-group :deep(.menu-select__trigger) {
-    display: grid;
-    place-items: center;
-    width: 24px;
+    width: 22px;
     height: 24px;
-    padding: 0;
-    background-color: transparent;
-    border: none;
-    border-radius: 4px;
 }
 
 .controls-group :deep(.menu-select__trigger:focus-visible) {
