@@ -56,7 +56,6 @@
             id: 'theme',
             label: 'Theme',
             icon: props.isDarkMode ? 'bi-moon' : 'bi-sun',
-            title: `Theme: ${themeLabels[props.themeMode]}`,
             subActions: themeModes.map((mode) => ({
                 id: mode,
                 label: themeLabels[mode],
@@ -67,17 +66,9 @@
     ]);
 
     function handleControlsGroupAction(actionId: string, parentId?: string) {
-        if (parentId === 'theme') {
-            emit('select-theme', actionId as ThemeMode);
-            return;
-        }
-        if (actionId === 'rulers') emit('toggle-rulers');
+        if (parentId === 'theme') emit('select-theme', actionId as ThemeMode);
+        else if (actionId === 'rulers') emit('toggle-rulers');
         else if (actionId === 'navigation-animations') emit('toggle-navigation-animations');
-        else if (actionId === 'theme') {
-            // Clicking the main icon (rather than opening the submenu) cycles to the next theme.
-            const nextIndex = (themeModes.indexOf(props.themeMode) + 1) % themeModes.length;
-            emit('select-theme', themeModes[nextIndex]!);
-        }
     }
 
     const fileName = computed(() => props.image?.fileName ?? 'No image');
@@ -243,72 +234,14 @@
 }
 
 .controls-group {
-    gap: 4px;
-    padding: 3px 4px;
-    background-color: var(--color-panel-raised);
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
     margin-left: auto;
     margin-right: 12px;
-}
-
-.controls-group :deep(.tool-button) {
-    width: 24px;
-    height: 24px;
-    font-size: 0.75rem;
-    border-radius: 4px;
-    color: var(--color-text-muted);
 }
 
 .controls-group :deep(.bi-rulers::before),
 .controls-group :deep(.bi-wind::before) {
     display: block;
     transform: translateY(1px);
-}
-
-.controls-group :deep(.tool-button:hover:not(:disabled)) {
-    color: var(--color-text);
-    background-color: var(--color-hover);
-}
-
-.controls-group :deep(.tool-button:focus-visible) {
-    outline: 1px solid var(--color-focus);
-    outline-offset: -3px;
-}
-
-.controls-group :deep(.tool-button.is-active:not(:disabled)) {
-    color: var(--color-text);
-    background-color: var(--color-active);
-}
-
-.controls-group :deep(.tool-button:active:not(:disabled)) {
-    box-shadow: inset 0 0 0 1px var(--color-border);
-}
-
-.controls-group :deep(.tool-button:disabled) {
-    opacity: var(--opacity-button-secondary-disabled);
-    cursor: default;
-}
-
-.controls-group :deep(.menu-select__trigger) {
-    width: 22px;
-    height: 24px;
-    padding: 0 2px;
-    color: var(--color-text-muted);
-    background-color: transparent;
-    border: none;
-    border-radius: 4px;
-    font-size: 0.75rem;
-}
-
-.controls-group :deep(.menu-select__trigger:hover:not(:disabled)) {
-    color: var(--color-text);
-    background-color: var(--color-hover);
-}
-
-.controls-group :deep(.menu-select__trigger:focus-visible) {
-    outline: 1px solid var(--color-focus);
-    outline-offset: -3px;
 }
 
 .close-button {
