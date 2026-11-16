@@ -1,3 +1,5 @@
+export const RULER_THICKNESS = 20;
+
 export interface RulerTick {
     value: number
     position: number

@@ -119,13 +119,13 @@
     position: absolute;
     bottom: 8px;
     left: 8px;
-    z-index: 1;
+    z-index: 3;
     display: flex;
     align-items: center;
     gap: 2px;
     padding: 2px;
     font-size: 12px;
-    background-color: color-mix(in srgb, var(--color-panel) 85%, transparent);
+    background-color: var(--color-panel);
     border: 1px solid var(--color-border);
     border-radius: 4px;
 }

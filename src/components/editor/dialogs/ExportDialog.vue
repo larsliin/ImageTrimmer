@@ -1,6 +1,6 @@
 <script setup lang="ts">
     import { computed, shallowRef } from 'vue';
-    import { BaseSelect, type SelectOption } from 'chrome-extension-component-library';
+    import { BaseSelect, BaseSpinner, type SelectOption } from 'chrome-extension-component-library';
     import { useExportPreview } from '@/composables/useExportPreview';
     import { EXPORT_QUALITY_PRESETS, exportFileName, type ExportMimeType, type PreparedExport } from '@/lib/imageIO';
     import type { ImageInfo } from '@/types/editor';
@@ -77,8 +77,8 @@
             <div class="export-preview" :aria-busy="calculating || (previewUrl !== null && loadedPreviewUrl !== previewUrl)">
                 <img v-if="previewUrl" class="export-preview__image" :src="previewUrl" alt="Encoded export preview"
                     @load="loadedPreviewUrl = previewUrl" />
-                <span v-if="calculating || (previewUrl !== null && loadedPreviewUrl !== previewUrl)"
-                    class="export-spinner" role="status" aria-label="Preparing export"></span>
+                <BaseSpinner v-if="calculating || (previewUrl !== null && loadedPreviewUrl !== previewUrl)"
+                    class="export-spinner" role="status" label="Preparing export" />
             </div>
             <div class="export-summary" role="status" aria-live="polite">
                 <p class="export-filename">{{ fileName }} <span class="export-dimensions">{{ bitmap.width }} &times; {{ bitmap.height }} px</span></p>
@@ -201,24 +201,9 @@
 }
 
 .export-spinner {
+    --spinner-color: #333;
+    --spinner-track-color: rgb(0 0 0 / 20%);
+
     z-index: 1;
-    width: 24px;
-    height: 24px;
-    border: 3px solid rgb(0 0 0 / 20%);
-    border-top-color: #333;
-    border-radius: 50%;
-    animation: export-spin 0.8s linear infinite;
-}
-
-@keyframes export-spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .export-spinner {
-        animation: none;
-    }
 }
 </style>

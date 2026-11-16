@@ -24,13 +24,13 @@ keyboard shortcuts, exporting, and tips for using the editor in narrow windows.
 ## Tech stack
 
 - Vue 3 and TypeScript
-- Shared Vue controls from `github:larsliin/ChromeExtensionsComponentLibrary#main`
+- Shared Vue controls from the committed library npm archive in `../packages/4f15209/`
 - Vite
 - Browser image APIs, including `ImageBitmap` and Canvas 2D
 - Node.js built-in test runner, ESLint, and Stylelint
 
 Prefer `chrome-extension-component-library` for equivalent buttons, form
-controls, selects, and alerts. Its stylesheet (including Bootstrap Icons) is
+controls, selects, alerts, and loading spinners. Its stylesheet (including Bootstrap Icons) is
 loaded once in `src/main.ts`, before app styles. ImageTrimmer owns theme
 persistence, editor layout/tokens, validation, focus workflows, dialogs, and
 image processing. The local checkbox/number/range adapters only preserve
@@ -51,6 +51,10 @@ npm run dev
 ```
 
 Vite prints the local development URL after startup.
+
+The shared library dependency is installed from
+`../packages/4f15209/chrome-extension-component-library-0.0.0.tgz`. Keep that
+archive alongside the workspace when reinstalling dependencies.
 
 ## Common commands
 

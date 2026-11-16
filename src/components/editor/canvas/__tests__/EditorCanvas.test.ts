@@ -41,6 +41,7 @@ const script = compileScript(parse(source).descriptor, { id: 'editor-canvas-test
     );
 const compiled = transpileModule(script, { compilerOptions: { module: ModuleKind.ESNext } }).outputText
     .replaceAll("'@/lib/zoom'", JSON.stringify(new URL('../../../../lib/zoom.ts', import.meta.url).href))
+    .replaceAll("'@/lib/rulers'", JSON.stringify(new URL('../../../../lib/rulers.ts', import.meta.url).href))
     .replaceAll("'@/lib/rotate'", JSON.stringify(new URL('../../../../lib/rotate.ts', import.meta.url).href))
     .replaceAll(/(['"])chrome-extension-component-library\1/g, JSON.stringify(import.meta.resolve('chrome-extension-component-library')))
     .replaceAll(/(['"])vue\1/g, JSON.stringify(import.meta.resolve('vue')));
@@ -104,6 +105,26 @@ function findElement(root: TestElement, type: string): TestElement | undefined {
         if (match) return match;
     }
 }
+
+test('image loading uses the shared spinner without duplicating the status announcement', () => {
+    const root: TestElement = { type: 'root', props: {}, children: [], parent: null, text: '' };
+    const app = renderer.createApp(editorCanvas, {
+        bitmap: null, zoom: 1, rulersEnabled: false, panEnabled: false, navigationAnimationsEnabled: false,
+        cropEnabled: false, straightenEnabled: false, eyedropperEnabled: false, busy: false, loading: true, error: null,
+    });
+
+    try {
+        app.mount(root);
+        const status = findElement(root, 'p');
+        assert.equal(status?.props.role, 'status');
+        const spinner = status?.children.find(child => String(child.props.class).includes('spinner--medium'));
+        assert.ok(spinner);
+        assert.equal(spinner.props['aria-hidden'], 'true');
+        assert.ok(status?.children.some(child => child.text === 'Loading image…'));
+    } finally {
+        app.unmount();
+    }
+});
 
 test('empty-state primary button stays enabled and emits import when clicked', () => {
     let imports = 0;

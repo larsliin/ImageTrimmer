@@ -1,7 +1,8 @@
 <script setup lang="ts">
-    import { BaseAlert, BaseButton } from 'chrome-extension-component-library';
+    import { BaseAlert, BaseButton, BaseSpinner } from 'chrome-extension-component-library';
     import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch, type ComponentPublicInstance } from 'vue';
     import { displaySize, type Size } from '@/lib/zoom';
+    import { RULER_THICKNESS } from '@/lib/rulers';
     import { usePan } from '@/composables/usePan';
     import { useFileDrop } from '@/composables/useFileDrop';
     import { useCanvasWheelZoom, type WheelZoomAnchor } from '@/composables/useCanvasWheelZoom';
@@ -248,7 +249,7 @@
             @wheel="handleWheel"
         >
             <p v-if="loading" class="status-message" role="status">
-                <i class="bi bi-hourglass-split" aria-hidden="true"></i>
+                <BaseSpinner class="status-message__spinner" aria-hidden="true" />
                 <span>Loading image…</span>
             </p>
             <div
@@ -318,6 +319,8 @@
 
 <style scoped>
 .workspace {
+    --ruler-thickness: v-bind('`${RULER_THICKNESS}px`');
+
     position: relative;
     display: grid;
     grid-template: minmax(0, 1fr) / minmax(0, 1fr);
@@ -339,10 +342,9 @@
 .viewport::-webkit-scrollbar {
     display: none;
 }
-
 .viewport--with-rulers {
-    padding-top: 44px;
-    padding-left: 44px;
+    padding-top: calc(24px + var(--ruler-thickness));
+    padding-left: calc(24px + var(--ruler-thickness));
 }
 
 .viewport:focus {
@@ -397,8 +399,13 @@
     color: var(--color-text-muted);
 }
 
-.status-message > .bi {
-    font-size: 48px;
+.status-message {
+    gap: 12px;
+}
+
+.status-message__spinner {
+    --spinner-color: currentColor;
+    --spinner-track-color: color-mix(in srgb, currentColor 25%, transparent);
 }
 
 .empty-state {
@@ -406,7 +413,6 @@
     justify-content: center;
     text-align: center;
 }
-
 .workspace.is-drop-active .empty-state__title {
     color: var(--color-focus);
 }
@@ -418,6 +424,11 @@
     border: 2px dashed var(--color-focus);
     background-color: color-mix(in srgb, var(--color-focus) 8%, transparent);
     pointer-events: none;
+}
+
+.viewport--with-rulers ~ .drop-indicator {
+    top: calc(var(--ruler-thickness) + 12px);
+    left: calc(var(--ruler-thickness) + 12px);
 }
 
 .empty-state__separator,

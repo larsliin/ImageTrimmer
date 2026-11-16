@@ -1,7 +1,7 @@
 <script setup lang="ts">
     import { computed, onBeforeUnmount, shallowRef, watch } from 'vue';
     import type { Size } from '@/lib/zoom';
-    import { rulerTicks } from '@/lib/rulers';
+    import { rulerTicks, RULER_THICKNESS as thickness } from '@/lib/rulers';
 
     const props = defineProps<{
         viewport: HTMLDivElement | null
@@ -10,7 +10,6 @@
         zoom: number
     }>();
 
-    const thickness = 20;
     const geometry = shallowRef({ x: 0, y: 0, width: 0, height: 0, imageWidth: 0, imageHeight: 0 });
 
     function measure() {
@@ -68,6 +67,8 @@
 
 <style scoped>
 .rulers {
+    --ruler-thickness: v-bind('`${thickness}px`');
+
     position: absolute;
     inset: 0;
     pointer-events: none;
@@ -90,17 +91,17 @@
 
 .ruler--horizontal {
     top: 0;
-    left: 20px;
-    width: calc(100% - 20px);
-    height: 20px;
+    left: var(--ruler-thickness);
+    width: calc(100% - var(--ruler-thickness));
+    height: var(--ruler-thickness);
     border-bottom: 1px solid var(--color-border);
 }
 
 .ruler--vertical {
-    top: 20px;
+    top: var(--ruler-thickness);
     left: 0;
-    width: 20px;
-    height: calc(100% - 20px);
+    width: var(--ruler-thickness);
+    height: calc(100% - var(--ruler-thickness));
     border-right: 1px solid var(--color-border);
 }
 
@@ -110,8 +111,8 @@
     left: 0;
     display: grid;
     place-items: center;
-    width: 20px;
-    height: 20px;
+    width: var(--ruler-thickness);
+    height: var(--ruler-thickness);
     color: var(--color-text-muted);
     background-color: var(--color-panel);
     border-right: 1px solid var(--color-border);

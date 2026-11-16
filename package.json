@@ -13,7 +13,7 @@
     "type-check": "vue-tsc --build"
   },
   "dependencies": {
-    "chrome-extension-component-library": "github:larsliin/ChromeExtensionsComponentLibrary#main",
+    "chrome-extension-component-library": "file:../packages/4f15209/chrome-extension-component-library-0.0.0.tgz",
     "vue": "^3.5.42"
   },
   "devDependencies": {
