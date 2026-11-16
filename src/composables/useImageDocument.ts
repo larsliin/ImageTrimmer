@@ -9,6 +9,7 @@ import type { ColorMode } from '@/lib/colorMode';
 import { isValidBrushStrokes, type BrushStroke } from '@/lib/brush';
 import type { Size } from '@/lib/zoom';
 import type { QuarterTurns } from '@/lib/rotate';
+import { isValidLevelAngle, MAX_LEVEL_ANGLE } from '@/lib/straighten';
 import {
     canvasToBlob,
     cropImageBitmap,
@@ -231,6 +232,26 @@ export function useImageDocument() {
         }
     }
 
+    async function straightenImage(crop: CropRect, angle: number): Promise<boolean> {
+        const doc = current.value;
+        if (!doc || isBusy.value) return false;
+        if (!isValidLevelAngle(angle)) {
+            error.value = `Enter a straighten angle between -${MAX_LEVEL_ANGLE}° and ${MAX_LEVEL_ANGLE}°.`;
+            return false;
+        }
+        if (!isValidCrop(crop, doc.bitmap) || !isCropInsideRotatedImage(crop, doc.bitmap, angle)) {
+            error.value = 'Keep the crop inside the rotated image. Resize or move it.';
+            return false;
+        }
+        if (angle === 0 && crop.x === 0 && crop.y === 0
+            && crop.width === doc.bitmap.width && crop.height === doc.bitmap.height) return true;
+        return applyBitmapEdit(
+            doc,
+            rotateCropImageBitmap(doc.bitmap, angle, crop),
+            'The image could not be straightened.',
+        );
+    }
+
     async function rotateImage(turns: QuarterTurns = 1, flipH = false, flipV = false): Promise<boolean> {
         const doc = current.value;
         if (!doc || isBusy.value) return false;
@@ -434,6 +455,7 @@ export function useImageDocument() {
         redo,
         importImage,
         cropImage,
+        straightenImage,
         rotateImage,
         resizeImage,
         levelsImage,

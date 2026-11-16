@@ -6,6 +6,7 @@ import { useToolDraft } from '../../composables/useToolDraft.ts';
 
 const drafts: ToolDraft[] = [
     { tool: 'crop', rect: { x: 0, y: 0, width: 200, height: 100 }, angle: 0 },
+    { tool: 'straighten', points: [], angle: 0 },
     { tool: 'resize', width: 200, height: 100 },
     { tool: 'rotate', turns: 0, flipH: false, flipV: false },
     { tool: 'brush', strokes: [] },
@@ -19,6 +20,7 @@ for (const baseline of drafts) {
         scope.run(() => useToolDraft(() => current.value, value => reports.push(value)));
         switch (baseline.tool) {
             case 'crop': current.value = { ...baseline, angle: 5 }; break;
+            case 'straighten': current.value = { ...baseline, points: [{ x: 1, y: 2 }] }; break;
             case 'resize': current.value = { ...baseline, width: 199 }; break;
             case 'rotate': current.value = { ...baseline, flipH: true }; break;
             case 'brush': current.value = { ...baseline, strokes: [{ thickness: 20, color: '#000000', points: [{ x: 10, y: 20 }] }] }; break;
@@ -59,6 +61,6 @@ test('invalid dimensions differ from the opening baseline', () => {
 });
 
 test('only FloatingToolbar tools participate', () => {
-    for (const tool of ['crop', 'resize', 'rotate', 'brush', 'eyedropper'] as const) assert.equal(isFloatingTool(tool), true);
+    for (const tool of ['crop', 'straighten', 'resize', 'rotate', 'brush', 'eyedropper'] as const) assert.equal(isFloatingTool(tool), true);
     for (const tool of ['levels', 'curves', 'brightness-contrast', 'color-mode', 'pan', null] as const) assert.equal(isFloatingTool(tool), false);
 });

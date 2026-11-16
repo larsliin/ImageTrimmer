@@ -29,10 +29,10 @@
     import { useToolCloseGuard } from './composables/useToolCloseGuard';
     import { isFloatingTool } from './lib/toolDraft';
     import { hasShortcutModifier } from './lib/shortcuts';
-    import { isThemeMode, type ThemeMode } from './lib/theme';
+    import { useTheme } from './composables/useTheme';
 
     const {
-        bitmap, info, documentId, status, error, isBusy, importImage, exportImage, cropImage, rotateImage,
+        bitmap, info, documentId, status, error, isBusy, importImage, exportImage, cropImage, straightenImage, rotateImage,
         resizeImage, levelsImage, curvesImage, colorModeImage, brightnessContrastImage, brushImage,
         renameImage, dismissError, closeImage,
         canUndo, canRedo, undo, redo, originalFileSize,
@@ -151,48 +151,14 @@
     async function downloadExport(prepared: PreparedExport) {
         if (await exportImage(prepared)) exportOpen.value = false;
     }
-    const themeMode = shallowRef<ThemeMode>('light');
-    const themeStorageKey = 'image-editor-theme';
-    const systemThemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const systemPrefersDark = shallowRef(systemThemeQuery.matches);
-
-    try {
-        const savedTheme = localStorage.getItem(themeStorageKey);
-        if (isThemeMode(savedTheme)) {
-            themeMode.value = savedTheme;
-        } else if (savedTheme !== null) {
-            console.warn('Ignoring an invalid saved theme preference:', savedTheme);
-        }
-    } catch (error) {
-        console.warn('Unable to restore the saved theme preference:', error);
-    }
-
-    const isDarkMode = computed(() => themeMode.value === 'auto'
-        ? systemPrefersDark.value
-        : themeMode.value === 'dark');
-
-    watch(isDarkMode, (isDark) => {
-        document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
-    }, { immediate: true });
-
-    function selectTheme(mode: ThemeMode) {
-        themeMode.value = mode;
-        try {
-            localStorage.setItem(themeStorageKey, mode);
-        } catch (error) {
-            console.warn('Unable to save the theme preference:', error);
-        }
-    }
-
-    function onSystemThemeChange(event: MediaQueryListEvent) {
-        systemPrefersDark.value = event.matches;
-    }
+    const { themeMode, isDarkMode, selectTheme } = useTheme();
 
     function selectTool(tool: ToolId) {
         guard.request(activeTool.value === tool ? { kind: 'close' } : { kind: 'switch', tool });
     }
 
     const applyCrop = (crop: CropRect, angle: number) => guard.apply(() => cropImage(crop, angle));
+    const applyStraighten = (crop: CropRect, angle: number) => guard.apply(() => straightenImage(crop, angle));
     const applyResize = (size: Size) => guard.apply(() => resizeImage(size));
     const applyRotationWithFlips = (turns: QuarterTurns, flipH: boolean, flipV: boolean) =>
         guard.apply(() => rotateImage(turns, flipH, flipV));
@@ -274,13 +240,11 @@
         document.addEventListener('keydown', handleEditorShortcut);
         window.addEventListener('beforeunload', warnBeforeUnloadWithBrushStrokes);
         reducedMotionQuery.addEventListener('change', onReducedMotionChange);
-        systemThemeQuery.addEventListener('change', onSystemThemeChange);
     });
     onBeforeUnmount(() => {
         document.removeEventListener('keydown', handleEditorShortcut);
         window.removeEventListener('beforeunload', warnBeforeUnloadWithBrushStrokes);
         reducedMotionQuery.removeEventListener('change', onReducedMotionChange);
-        systemThemeQuery.removeEventListener('change', onSystemThemeChange);
     });
 
     function onReducedMotionChange(event: MediaQueryListEvent) {
@@ -335,6 +299,7 @@
             :pan-enabled="activeTool === 'pan'"
             :navigation-animations-enabled="navigationAnimationsEnabled"
             :crop-enabled="activeTool === 'crop'"
+            :straighten-enabled="activeTool === 'straighten'"
             :eyedropper-enabled="activeTool === 'eyedropper'"
             :busy="toolBlocked"
             :loading="status === 'loading'"
@@ -354,6 +319,9 @@
             @crop="(crop, angle) => applyCrop(crop, angle)"
             @cancel-crop="requestClose"
             @crop-dirty="guard.reportDirty"
+            @straighten="(crop, angle) => applyStraighten(crop, angle)"
+            @cancel-straighten="requestClose"
+            @straighten-dirty="guard.reportDirty"
             @exit-eyedropper="requestClose"
             @close-eyedropper="closeEyedropperFromToolbar"
         >

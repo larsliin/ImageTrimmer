@@ -3,8 +3,10 @@
     import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch, type ComponentPublicInstance } from 'vue';
     import { displaySize, type Size } from '@/lib/zoom';
     import { usePan } from '@/composables/usePan';
+    import { useFileDrop } from '@/composables/useFileDrop';
     import { useCanvasWheelZoom, type WheelZoomAnchor } from '@/composables/useCanvasWheelZoom';
     import CropOverlay from './CropOverlay.vue';
+    import StraightenOverlay from './StraightenOverlay.vue';
     import EditorRulers from './EditorRulers.vue';
     import type { CropRect } from '@/lib/crop';
     import { applyLevelsToPixels, type LevelsParams } from '@/lib/levels';
@@ -21,6 +23,7 @@
         panEnabled: boolean
         navigationAnimationsEnabled: boolean
         cropEnabled: boolean
+        straightenEnabled: boolean
         eyedropperEnabled: boolean
         busy: boolean
         loading: boolean
@@ -41,44 +44,22 @@
         crop: [crop: CropRect, angle: number]
         'crop-dirty': [value: boolean]
         'cancel-crop': []
+        straighten: [crop: CropRect, angle: number]
+        'straighten-dirty': [value: boolean]
+        'cancel-straighten': []
         'zoom-in': []
         'zoom-out': []
         'exit-eyedropper': []
         'close-eyedropper': []
     }>();
 
-    const isDropActive = ref(false);
-    function handleDragEnter(event: DragEvent) {
-        event.preventDefault();
-        isDropActive.value = true;
-    }
-
-    function handleDragOver(event: DragEvent) {
-        event.preventDefault();
-        if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
-    }
-
-    function handleDragLeave(event: DragEvent) {
-        event.preventDefault();
-        const workspace = event.currentTarget;
-        if (workspace instanceof HTMLElement && event.relatedTarget instanceof Node
-            && workspace.contains(event.relatedTarget)) return;
-        isDropActive.value = false;
-    }
-
-    function handleDrop(event: DragEvent) {
-        event.preventDefault();
-        isDropActive.value = false;
-        const file = event.dataTransfer?.files[0];
-        if (file) emit('import', file);
-    }
+    const { isDropActive, handleDragEnter, handleDragOver, handleDragLeave, handleDrop } = useFileDrop(file => emit('import', file));
 
     const cropAngle = ref(0);
-    watch(() => props.cropEnabled, () => {
+    const straightenAngle = ref(0);
+    watch([() => props.cropEnabled, () => props.straightenEnabled, () => props.bitmap], () => {
         cropAngle.value = 0;
-    });
-    watch(() => props.bitmap, () => {
-        cropAngle.value = 0;
+        straightenAngle.value = 0;
     });
 
     const viewportRef = useTemplateRef<HTMLDivElement>('viewport');
@@ -93,9 +74,12 @@
 
     watch([() => props.zoom, () => props.bitmap], stopMomentum, { flush: 'sync' });
 
+    const frameSize = computed(() =>
+        props.bitmap ? rotatedSize(props.bitmap, props.rotationPreview ?? 0) : null,
+    );
     const previewStyle = computed(() => {
-        if (!props.bitmap) return undefined;
-        const size = displaySize(rotatedSize(props.bitmap, props.rotationPreview ?? 0), props.zoom);
+        if (!frameSize.value) return undefined;
+        const size = displaySize(frameSize.value, props.zoom);
         return { width: `${size.width}px`, height: `${size.height}px` };
     });
 
@@ -141,7 +125,7 @@
     function applyPreview() {
         if (!pendingPreviewData) return;
         const { bitmap, canvas, levels, curves, colorMode, brightnessContrast, rotation, flipH, flipV } = pendingPreviewData;
-        const size = rotatedSize(bitmap, rotation ?? 0);
+        const size = rotatedSize(bitmap, rotation);
         if (canvas.width !== size.width || canvas.height !== size.height) {
             canvas.width = size.width;
             canvas.height = size.height;
@@ -278,7 +262,8 @@
                     class="preview"
                     :class="{ 'is-magnified': zoom > 1 }"
                     aria-label="Image preview"
-                    :style="cropEnabled && cropAngle !== 0 ? { transform: `rotate(${cropAngle}deg)` } : undefined"
+                    :style="cropEnabled && cropAngle !== 0 ? { transform: `rotate(${cropAngle}deg)` }
+                        : straightenEnabled ? { transform: `rotate(${straightenAngle}deg)` } : undefined"
                 ></canvas>
                 <CropOverlay
                     v-if="cropEnabled"
@@ -289,6 +274,16 @@
                     @apply="(crop, angle) => emit('crop', crop, angle)"
                     @cancel="emit('cancel-crop')"
                     @dirty="emit('crop-dirty', $event)"
+                />
+                <StraightenOverlay
+                    v-if="straightenEnabled"
+                    :image="bitmap"
+                    :disabled="busy"
+                    :pan-mode="isPanMode"
+                    @preview="straightenAngle = $event"
+                    @apply="(crop, angle) => emit('straighten', crop, angle)"
+                    @cancel="emit('cancel-straighten')"
+                    @dirty="emit('straighten-dirty', $event)"
                 />
                 <EyedropperTool
                     v-if="eyedropperEnabled"
@@ -308,10 +303,10 @@
         </div>
 
         <EditorRulers
-            v-if="rulersEnabled && bitmap && !loading"
+            v-if="rulersEnabled && frameSize && !loading"
             :viewport="viewportRef"
             :surface="imageSurfaceRef"
-            :image="rotatedSize(bitmap, rotationPreview ?? 0)"
+            :image="frameSize"
             :zoom="zoom"
         />
 

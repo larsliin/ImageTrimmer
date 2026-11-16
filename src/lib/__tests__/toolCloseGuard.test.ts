@@ -129,3 +129,18 @@ test('deferred close action runs only after discard, never keep or stacked reque
     assert.equal(completed, 1);
     state.stop();
 });
+
+test('Straighten Cancel uses the standard dirty-draft close guard', () => {
+    const state = setup('straighten');
+    state.guard.reportDirty(true);
+    state.guard.request({ kind: 'close' });
+    assert.deepEqual(state.guard.pendingIntent.value, { kind: 'close' });
+    assert.equal(state.activeTool.value, 'straighten');
+    state.guard.keepEditing();
+    assert.equal(state.activeTool.value, 'straighten');
+    state.guard.request({ kind: 'close' });
+    state.guard.discardChanges();
+    assert.equal(state.activeTool.value, null);
+    assert.equal(state.guard.pendingIntent.value, null);
+    state.stop();
+});

@@ -342,3 +342,21 @@ test('unrelated pointers cannot move or end a popup drag', async (t) => {
     assert.equal(isDragging(), true);
     grip.send('pointerup');
 });
+
+test('floating toolbar keeps natural one-row sizing when the window is narrower than it', async (t) => {
+    const { dialog, grip, browserWindow } = setup(t, toolbar);
+    await nextTick();
+    const natural = dialog.getBoundingClientRect();
+    for (const width of [700, 300, 240]) {
+        browserWindow.innerWidth = width;
+        browserWindow.dispatchEvent(new Event('resize'));
+        await nextTick();
+        const style = dialog.props.style as Record<string, unknown>;
+        assert.doesNotMatch(String(dialog.props.class), /is-scrollable/);
+        assert.equal(style.maxWidth, undefined, 'no viewport-based width cap');
+        assert.equal(dialog.getBoundingClientRect().width, natural.width);
+        assert.equal(dialog.getBoundingClientRect().height, natural.height);
+        const handle = grip.getBoundingClientRect();
+        assert.ok(handle.left >= 0 && handle.left + handle.width <= width, 'grip stays reachable');
+    }
+});

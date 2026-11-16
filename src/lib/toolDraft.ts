@@ -1,10 +1,11 @@
 import type { ToolId } from '../types/editor';
-import type { CropRect } from './crop';
+import type { CropRect, Point } from './crop';
 import type { QuarterTurns } from './rotate';
 import type { BrushStroke } from './brush';
 
 export type ToolDraft
     = { tool: 'crop', rect: CropRect, angle: number }
+    | { tool: 'straighten', points: readonly Point[], angle: number | string }
     | { tool: 'resize', width: number | string, height: number | string }
     | { tool: 'rotate', turns: QuarterTurns, flipH: boolean, flipV: boolean }
     | { tool: 'brush', strokes: readonly BrushStroke[] };
@@ -14,6 +15,7 @@ export function toolDraftKey(draft: ToolDraft): string {
     let values: unknown;
     switch (draft.tool) {
         case 'crop': values = [draft.rect.x, draft.rect.y, draft.rect.width, draft.rect.height, draft.angle]; break;
+        case 'straighten': values = [draft.points.map(point => [point.x, point.y]), draft.angle]; break;
         case 'resize': values = [draft.width, draft.height]; break;
         case 'rotate': values = [draft.turns, draft.flipH, draft.flipV]; break;
         case 'brush': values = draft.strokes.map(stroke =>
@@ -24,7 +26,7 @@ export function toolDraftKey(draft: ToolDraft): string {
 }
 
 export function isFloatingTool(tool: ToolId | null): boolean {
-    return tool === 'crop' || tool === 'resize' || tool === 'rotate' || tool === 'brush' || tool === 'eyedropper';
+    return tool === 'crop' || tool === 'straighten' || tool === 'resize' || tool === 'rotate' || tool === 'brush' || tool === 'eyedropper';
 }
 
 export type ToolCloseIntent = { kind: 'close' } | { kind: 'switch', tool: ToolId };

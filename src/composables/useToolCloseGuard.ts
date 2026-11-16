@@ -70,7 +70,7 @@ export function useToolCloseGuard(options: CloseGuardOptions) {
         if (blocked.value || !pendingIntent.value) return;
         const intent = pendingIntent.value;
         pendingIntent.value = null;
-        // Unmounting destroys only this tool's local draft; existing deactivation clears previews/strokes.
+        // Closing or switching unmounts the local draft.
         complete(intent);
         const onComplete = pendingCompletion;
         pendingCompletion = undefined;

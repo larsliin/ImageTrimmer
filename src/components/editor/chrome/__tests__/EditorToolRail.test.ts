@@ -655,7 +655,7 @@ test('collapses tool groups progressively before undo and redo reach the menu', 
     assert.ok(launcher && panel);
     assert.deepEqual(getPopupSections(panel), [
         { label: 'Edit history', actionIds: ['undo', 'redo'] },
-        { label: 'Transform tools', actionIds: ['crop', 'resize', 'rotate'] },
+        { label: 'Transform tools', actionIds: ['crop', 'straighten', 'resize', 'rotate'] },
         { label: 'Paint tools', actionIds: ['brush'] },
         {
             label: 'Adjustment tools',
@@ -800,6 +800,7 @@ test('collapsing/restoring follows group order and the smallest rail can scroll'
     ]);
     assert.deepEqual(getToolIds(allToolsPanel), [
         'crop',
+        'straighten',
         'resize',
         'rotate',
         'brush',
@@ -918,11 +919,12 @@ test('collapsing/restoring follows group order and the smallest rail can scroll'
     ]);
     assertMoreToolsLauncher(tiny.root);
     await click(tinyLauncher);
-    for (const label of ['Crop', 'Resize', 'Rotate image']) {
+    for (const label of ['Crop', 'Straighten', 'Resize', 'Rotate image']) {
         assert.ok(findElement(transformPanel, 'aria-label', label), `${label} should be in Transform tools`);
     }
     assert.deepEqual(getToolIds(transformPanel), [
         'crop',
+        'straighten',
         'resize',
         'rotate',
         'brush',
@@ -990,7 +992,7 @@ test('collapsing/restoring follows group order and the smallest rail can scroll'
         .slice(groupsIndex + 1)
         .find((child) => child.type !== '#text' && child.type !== '#comment');
     assert.equal(nextGroupElement?.type, 'hr', 'editing groups should be separated from View tools');
-    assert.deepEqual(getToolIds(transformGroup), ['crop', 'resize', 'rotate']);
+    assert.deepEqual(getToolIds(transformGroup), ['crop', 'straighten', 'resize', 'rotate']);
     assert.deepEqual(getToolIds(paintGroup), ['brush']);
     assert.deepEqual(getToolIds(adjustmentGroup), [
         'levels',

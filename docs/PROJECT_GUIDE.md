@@ -9,6 +9,7 @@ how to open an image, use the editing tools, and download your result.
 - [Understanding the editor](#understanding-the-editor)
 - [Transform the image](#transform-the-image)
   - [Crop](#crop)
+  - [Straighten](#straighten)
   - [Resize](#resize)
   - [Rotate and flip](#rotate-and-flip)
 - [Adjust color and tone](#adjust-color-and-tone)
@@ -53,7 +54,7 @@ there are unapplied edits prompts you to keep editing or discard those edits.
   **More tools**.
 - **Preview:** Shows the image and interactive overlays, such as the crop
   selection or brush strokes.
-- **Floating toolbars:** Crop, Resize, and Rotate controls appear above the
+- **Floating toolbars:** Crop, Straighten, Resize, and Rotate controls appear above the
   preview. Drag the dotted grip to move one.
 - **Dialogs:** Color adjustments and Export open a dialog. Use its **Apply**,
   **Download**, or **Cancel** controls to finish.
@@ -63,8 +64,8 @@ Previews are not permanently applied until you choose the tool's apply action.
 
 ## Transform the image
 
-Use the **Crop**, **Resize**, and **Rotate image** buttons on the left toolbar
-to change the image's framing, dimensions, or orientation. Each opens a
+Use the **Crop**, **Straighten**, **Resize**, and **Rotate image** buttons on
+the left toolbar to change the image's framing, dimensions, or orientation. Each opens a
 floating toolbar above the preview. Preview the change, then apply it or
 cancel it before choosing another tool.
 
@@ -76,13 +77,14 @@ cancel it before choosing another tool.
 3. Use the crop toolbar to enter exact **X**, **Y**, **Width**, and **Height**
    values in source-image pixels. The crop must stay inside the image and have
    a width and height of at least one pixel.
-4. Optionally select **Snap to pixel** to align the crop to whole pixels.
+4. Optionally select **Snap to pixel** to align the crop to whole pixels. This
+   preference applies to Crop and is unchanged by Straighten.
    Hold **Shift** while drawing to constrain the selection to a square. Hold
    **Shift** while resizing from a corner to make a square around the opposite
    corner. You can press or release Shift while dragging to toggle the
    constraint.
-5. To straighten the image, use the angle slider or enter an angle in degrees.
-   The crop is fitted to the rotated image automatically.
+5. To rotate the crop preview while framing it, use the angle slider or enter
+   an angle in degrees. The crop is fitted to the rotated image automatically.
 6. Select **Apply crop** (or press **Enter**) to commit, or **Cancel** (or
    **Escape**) to discard the preview.
 
@@ -90,6 +92,57 @@ Focus a crop handle and use the arrow keys to adjust it by one pixel. Crop
 dimensions shown in the toolbar may be rounded for display; the actual
 selection retains its precision unless pixel snapping is enabled. Hold
 **Shift** while using a handle's arrow keys to keep the crop square.
+
+### Straighten
+
+Use **Straighten** to level a tilted horizon, wall, or other line that should be
+horizontal. It is separate from the angle slider in Crop, which still works as
+before.
+
+1. Select **Straighten** from the left toolbar.
+2. Set a reference line by clicking two distinct points along an edge that
+   should be level, or press and drag from the first point to the second, then
+   release. The order of the points does not matter. Pointer movement of
+   3 pixels or less counts as a click; a longer drag whose line is shorter
+   than 8 displayed pixels is rejected, so retry with the points farther
+   apart. For keyboard placement, focus the image, use the arrow keys to
+   position each point, and press **Enter** after each one; hold **Shift** with
+   an arrow key to move farther.
+3. The Angle slider, degree field, and **Apply straighten** are available as soon
+   as Straighten opens. You can set a manual angle and apply directly without a
+   reference line; the automatic crop fits inside the rotated image.
+   Setting the second valid point only records the line; it does not rotate the
+   image or start framing. Select the **Straighten** icon in the toolbar (it stays
+   disabled until the line is complete and is not already level) to level the
+   measured line and initialize a crop inside the rotated image. If you rotated
+   the preview manually first, the line is still measured against the image itself.
+   The frame has four corner handles, used only to rotate
+   the image around its stable center; dragging inside or outside the crop does
+   nothing (use the Crop tool for a custom crop). There are no side-resize handles. The Crop **Snap to pixel** preference does not
+   affect Straighten. Corner rotation fits the crop inside the rotated image.
+   Nothing is committed until **Apply straighten**.
+4. Fine-tune the angle with the slider, degree field, or four rotation
+   handles. Focus a corner handle and press **Left** or **Right** for
+   0.1-degree steps; add **Shift** for 1-degree steps. The crop
+   fits inside the rotated image automatically as the angle changes. The measured line remains attached to the image. Rotation always previews the tool-entry
+   image, without accumulating blur. The **Straighten** icon stays available
+   during framing, disabled while the measured line is level. Manual angle
+   changes away from level enable it again. Select it to restore the measured
+   correction; the crop fits within the rotated image automatically.
+5. **Apply straighten** stays visible during measurement and framing. It is
+   enabled only when the current valid crop or angle changes the resulting image.
+   A reference line alone is not an edit to apply. Returning to the full frame
+   at 0° disables Apply, even after earlier edits. Invalid angles and active
+   processing or framing drags block Apply.
+   Select **Apply straighten** (or press **Enter** in an angle control) to commit,
+   or **Cancel** (or **Escape**) to discard the preview. Cancel and reopen
+   Straighten to start over. The image changes only when you apply.
+
+The correction is the shortest turn, between -90 and 90 degrees. Transparent
+areas are preserved. The automatic crop retains the original proportions; use
+the Crop tool for custom framing. Crop's own angle remains limited to ±45° and
+continues fitting its selection automatically.
+Applying is a single edit that **Undo** reverts in one step.
 
 ### Resize
 
@@ -228,7 +281,7 @@ Shortcuts that use the platform modifier mean **Ctrl** on Windows/Linux and
 | Arrow keys on the focused Eyedropper preview | Move the sampling point by one image pixel |
 | **Shift** + arrow keys on the focused Eyedropper preview | Move the sampling point by ten image pixels |
 | **Enter** or **Space** on the focused Eyedropper preview | Sample the current pixel |
-| **Enter** while Crop, Resize, or Rotate controls are focused | Apply the current edit |
+| **Enter** while Crop, Straighten, Resize, or Rotate controls are focused | Apply the current edit (on the Straighten icon, re-level the guide without applying) |
 | **Escape** while an edit tool or dialog is active | Cancel the current preview or close the dialog |
 | Arrow keys on a toolbar or dialog grip | Move the toolbar or dialog |
 | **Shift** + arrow keys on a toolbar or dialog grip | Move it by a larger step |
@@ -276,8 +329,11 @@ you try to leave or replace an image with edits that have not been downloaded.
 
 ## Floating toolbars on narrow windows
 
-Crop, Resize, Rotate, and Eyedropper toolbars stay on one line: their controls
-do not wrap into multiple rows. When the browser window is narrower than a
+Toolbars stay on one line: their controls do not wrap into multiple rows and
+have no internal scrollbars. The optional angle
+slider in standard Crop hides on narrower windows; its numeric angle field remains available.
+
+For Crop, Straighten, Resize, Rotate, and Eyedropper, when the browser window is narrower than a
 toolbar, part of the toolbar can extend beyond the window edge. The dotted grip
 is kept within reach, but that does **not** mean every control remains visible.
 

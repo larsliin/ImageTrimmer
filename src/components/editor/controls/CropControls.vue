@@ -1,6 +1,7 @@
 <script setup lang="ts">
     import { computed } from 'vue';
     import { MAX_STRAIGHTEN_ANGLE, type CropRect } from '@/lib/crop';
+    import { MAX_LEVEL_ANGLE } from '@/lib/straighten';
     import type { Size } from '@/lib/zoom';
     import FloatingToolbar from '../chrome/FloatingToolbar.vue';
     import { BaseIconButton } from 'chrome-extension-component-library';
@@ -15,17 +16,27 @@
         dragging: boolean
         valid: boolean
         unchanged: boolean
+        straighten?: boolean
+        canStraighten?: boolean
     }>();
+    const maxAngle = computed(() => props.straighten ? MAX_LEVEL_ANGLE : MAX_STRAIGHTEN_ANGLE);
+    const toolName = computed(() => props.straighten ? 'Straighten' : 'Crop');
+    const actionName = computed(() => props.straighten ? 'straighten' : 'crop');
 
     const emit = defineEmits<{
         'update:crop': [crop: CropRect]
         'manual-change': [event: Event]
         apply: []
         cancel: []
+        straighten: []
     }>();
 
     const angle = defineModel<number>('angle', { required: true });
     const snapToPixel = defineModel<boolean>('snapToPixel', { required: true });
+    const validationMessage = computed(() => {
+        if (!props.straighten) return 'Invalid crop or angle';
+        return `Enter an angle within ±${maxAngle.value}°.`;
+    });
 
     function updateCrop(field: keyof CropRect, value: number) {
         emit('update:crop', { ...props.crop, [field]: value });
@@ -49,27 +60,32 @@
 
 <template>
     <Teleport defer to="#editor-tool-controls">
-        <FloatingToolbar label="Crop toolbar">
+        <FloatingToolbar :label="`${toolName} toolbar`">
+            <!-- Measured angles can be finer than the input step; the overlay validates Straighten. -->
             <form
                 class="crop-controls"
-                aria-label="Crop controls"
+                :class="{ 'is-straighten': straighten }"
+                :aria-label="`${toolName} controls`"
+                :novalidate="straighten"
                 @submit.prevent="emit('apply')"
                 @input="emit('manual-change', $event)"
                 @keydown.esc.prevent="emit('cancel')"
             >
                 <fieldset :disabled="disabled || dragging">
                     <div class="crop-fields">
-                        <label>X <BaseNumberInput v-model.number="cropX" aria-label="Crop X" min="0"
-                            :max="image.width - 1" required :step="snapToPixel ? 1 : 'any'" @blur="zeroIfEmpty($event, 'x')" /></label>
-                        <label>Y <BaseNumberInput v-model.number="cropY" aria-label="Crop Y" min="0"
-                            :max="image.height - 1" required :step="snapToPixel ? 1 : 'any'" @blur="zeroIfEmpty($event, 'y')" /></label>
-                        <label>Width <BaseNumberInput v-model.number="cropWidth" aria-label="Crop width" min="1"
-                            :max="displayDimension(image.width - crop.x)" required :step="snapToPixel ? 1 : 'any'"
-                            @blur="zeroIfEmpty($event, 'width')" /></label>
-                        <label>Height <BaseNumberInput v-model.number="cropHeight" aria-label="Crop height" min="1"
-                            :max="displayDimension(image.height - crop.y)" required :step="snapToPixel ? 1 : 'any'"
-                            @blur="zeroIfEmpty($event, 'height')" /></label>
-                        <label class="crop-snap">
+                        <template v-if="!straighten">
+                            <label>X <BaseNumberInput v-model.number="cropX" aria-label="Crop X" min="0"
+                                :max="image.width - 1" required :step="snapToPixel ? 1 : 'any'" @blur="zeroIfEmpty($event, 'x')" /></label>
+                            <label>Y <BaseNumberInput v-model.number="cropY" aria-label="Crop Y" min="0"
+                                :max="image.height - 1" required :step="snapToPixel ? 1 : 'any'" @blur="zeroIfEmpty($event, 'y')" /></label>
+                            <label>Width <BaseNumberInput v-model.number="cropWidth" aria-label="Crop width" min="1"
+                                :max="displayDimension(image.width - crop.x)" required :step="snapToPixel ? 1 : 'any'"
+                                @blur="zeroIfEmpty($event, 'width')" /></label>
+                            <label>Height <BaseNumberInput v-model.number="cropHeight" aria-label="Crop height" min="1"
+                                :max="displayDimension(image.height - crop.y)" required :step="snapToPixel ? 1 : 'any'"
+                                @blur="zeroIfEmpty($event, 'height')" /></label>
+                        </template>
+                        <label v-if="!straighten" class="crop-snap">
                             <BaseCheckbox
                                 v-model="snapToPixel"
                                 aria-label="Snap to pixel"
@@ -78,26 +94,34 @@
                             Snap to pixel
                         </label>
                         <span class="crop-divider" role="separator" aria-orientation="vertical"></span>
-                        <label class="crop-angle-slider">Straighten
+                        <label class="crop-angle-slider" @keydown.enter.prevent.stop="emit('apply')">{{ straighten ? 'Angle' : 'Straighten' }}
                             <BaseRangeInput v-model.number="angle" class="crop-angle-range" aria-label="Straighten angle slider"
-                                :min="-MAX_STRAIGHTEN_ANGLE" :max="MAX_STRAIGHTEN_ANGLE" step="0.1" />
+                                :min="-maxAngle" :max="maxAngle" step="0.1" />
                         </label>
-                        <label><BaseNumberInput v-model.number="angle" aria-label="Straighten angle in degrees"
-                            :min="-MAX_STRAIGHTEN_ANGLE" :max="MAX_STRAIGHTEN_ANGLE" step="0.1" required @blur="zeroIfEmpty($event, 'angle')" /> deg</label>
-                        <BaseIconButton variant="secondary" class="icon-button" label="Reset angle" title="Reset angle" :disabled="angle === 0" @click="angle = 0">
+                        <label @keydown.enter.prevent.stop="emit('apply')"><BaseNumberInput v-model.number="angle" aria-label="Straighten angle in degrees"
+                            :min="-maxAngle" :max="maxAngle" step="0.1" required @blur="zeroIfEmpty($event, 'angle')" /> deg</label>
+                        <BaseIconButton v-if="straighten" variant="secondary" type="button" class="icon-button"
+                            label="Straighten" title="Straighten" :disabled="disabled || dragging || !canStraighten"
+                            @click="emit('straighten')">
+                            <i class="bi bi-hr" aria-hidden="true"></i>
+                        </BaseIconButton>
+                        <BaseIconButton v-if="!straighten" variant="secondary" class="icon-button" label="Reset angle" title="Reset angle" :disabled="angle === 0" @click="angle = 0">
                             <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
                         </BaseIconButton>
                     </div>
                     <p v-if="!valid && !dragging" class="crop-error" role="alert"
-                        :title="`Enter a non-empty crop inside the image bounds and an angle within ±${MAX_STRAIGHTEN_ANGLE}°.`">
-                        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> Invalid crop or angle
+                        :title="straighten ? validationMessage : `Enter a non-empty crop inside the image bounds and an angle within ±${maxAngle}°.`">
+                        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+                        {{ validationMessage }}
                     </p>
                     <div class="crop-actions">
                         <span class="crop-divider" role="separator" aria-orientation="vertical"></span>
-                        <BaseIconButton variant="primary" type="submit" class="icon-button" label="Apply crop" title="Apply crop" :disabled="!valid || unchanged">
+                        <BaseIconButton variant="primary" type="submit" class="icon-button" :label="`Apply ${actionName}`"
+                            :title="`Apply ${actionName}`" :disabled="!valid || unchanged">
                             <i class="bi bi-check-lg" aria-hidden="true"></i>
                         </BaseIconButton>
-                        <BaseIconButton variant="secondary" class="icon-button" label="Cancel crop" title="Cancel crop" @click="emit('cancel')">
+                        <BaseIconButton variant="secondary" class="icon-button" :label="`Cancel ${actionName}`"
+                            :title="`Cancel ${actionName}`" @click="emit('cancel')">
                             <i class="bi bi-x-lg" aria-hidden="true"></i>
                         </BaseIconButton>
                     </div>
@@ -204,7 +228,7 @@ input[type='number'] {
 }
 
 @media (max-width: 1400px) {
-    .crop-angle-slider {
+    .crop-controls:not(.is-straighten) .crop-angle-slider {
         display: none;
     }
 

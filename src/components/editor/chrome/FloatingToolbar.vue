@@ -4,8 +4,9 @@
     import type { Point } from '@/lib/crop';
     import { clampGripOffset } from '@/lib/drag';
 
-    defineProps<{
+    const props = defineProps<{
         label: string
+        scrollable?: boolean
     }>();
 
     const NUDGE = 10;
@@ -57,6 +58,9 @@
             left: `${anchor.value.x}px`,
             top: `${anchor.value.y}px`,
             transform: transform.value,
+            maxWidth: props.scrollable
+                ? `calc(100vw - ${Math.max(0, anchor.value.x + offset.value.x)}px - 16px)`
+                : undefined,
         }
         : { transform: transform.value });
 
@@ -90,7 +94,7 @@
     <div
         ref="root"
         class="floating-toolbar"
-        :class="{ 'is-dragging': dragging }"
+        :class="{ 'is-dragging': dragging, 'is-scrollable': scrollable }"
         role="toolbar"
         :aria-label="label"
         :style="style"
@@ -133,6 +137,14 @@
 
 .floating-toolbar.is-dragging {
     user-select: none;
+}
+
+.floating-toolbar.is-scrollable {
+    max-width: calc(100vw - 32px);
+}
+
+.is-scrollable .floating-toolbar__content {
+    overflow-x: auto;
 }
 
 .floating-toolbar__grip {

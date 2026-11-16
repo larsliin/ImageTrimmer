@@ -2,6 +2,41 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { cropFromPoints, squareCropFromPoints, moveCrop, resizeCrop, snapCropToPixels, isValidCrop, previewToImagePoint, type CropHandle, largestCropInsideRotatedImage, isCropInsideRotatedImage, constrainCropInsideRotatedImage } from '../crop.ts';
 
+test('rotated constraints snap inward even when the fractional crop already fits', () => {
+    const image = { width: 800, height: 600 };
+    const crop = { x: 300.2, y: 200.3, width: 100.6, height: 99.5 };
+    for (const angle of [-90, -45, 0, 45, 90]) {
+        const result = constrainCropInsideRotatedImage(crop, image, angle, true);
+        assert.ok(Object.values(result).every(Number.isInteger));
+        assert.ok(result.x >= crop.x && result.y >= crop.y);
+        assert.ok(result.x + result.width <= crop.x + crop.width);
+        assert.ok(result.y + result.height <= crop.y + crop.height);
+        assert.equal(isCropInsideRotatedImage(result, image, angle), true);
+    }
+});
+
+test('rotated constraints stay valid for edge and tiny crops across the entire Straighten range', () => {
+    for (const image of [{ width: 800, height: 600 }, { width: 600, height: 800 }, { width: 1, height: 1 }]) {
+        for (const crop of [
+            { x: 0, y: 0, ...image },
+            { x: 0.1, y: 0.2, width: image.width / 2, height: image.height / 2 },
+            { x: image.width - 0.4, y: image.height - 0.3, width: 0.3, height: 0.2 },
+        ]) {
+            for (let angle = -90; angle <= 90; angle++) {
+                const fitted = constrainCropInsideRotatedImage(crop, image, angle);
+                const snapped = constrainCropInsideRotatedImage(crop, image, angle, true);
+                for (const result of [fitted, snapped]) {
+                    assert.equal(isValidCrop(result, image), true, JSON.stringify({ image, crop, angle, result }));
+                    assert.equal(isCropInsideRotatedImage(result, image, angle), true);
+                }
+                assert.ok(snapped.x >= fitted.x - 1e-8 && snapped.y >= fitted.y - 1e-8);
+                assert.ok(snapped.x + snapped.width <= fitted.x + fitted.width + 1e-8);
+                assert.ok(snapped.y + snapped.height <= fitted.y + fitted.height + 1e-8);
+            }
+        }
+    }
+});
+
 test('pixel snapping keeps tiny selections non-empty and inside image bounds', () => {
     const image = { width: 800, height: 600 };
     for (const crop of [

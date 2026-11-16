@@ -3,6 +3,7 @@ import { applyCurvesToPixels, type CurvesParams } from './curves';
 import { applyColorModeToPixels, type ColorMode } from './colorMode';
 import { applyBrightnessContrastToPixels, type BrightnessContrastParams } from './brightnessContrast';
 import { drawRotatedImage, rotatedSize, type QuarterTurns } from './rotate';
+import { drawStraightened } from './straighten';
 import { drawBrushStroke, isValidBrushStrokes, type BrushStroke } from './brush';
 
 export type ExportMimeType = 'image/png' | 'image/jpeg' | 'image/webp';
@@ -149,12 +150,7 @@ export async function rotateCropImageBitmap(
     if (!context) {
         throw new Error('Canvas 2D rendering is not available in this browser.');
     }
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = 'high';
-    context.translate(-crop.x, -crop.y);
-    context.translate(source.width / 2, source.height / 2);
-    context.rotate(angleDegrees * Math.PI / 180);
-    context.drawImage(source, -source.width / 2, -source.height / 2);
+    drawStraightened(context, source, angleDegrees, crop);
     return createImageBitmap(canvas);
 }
 

@@ -87,7 +87,7 @@ export function largestCropInsideRotatedImage(image: Size, angleDegrees: number)
 }
 
 export function constrainCropInsideRotatedImage(crop: CropRect, image: Size, angleDegrees: number, snapToPixel = false): CropRect {
-    if (isCropInsideRotatedImage(crop, image, angleDegrees)) return { ...crop };
+    if (!snapToPixel && isCropInsideRotatedImage(crop, image, angleDegrees)) return { ...crop };
     const radians = angleDegrees * Math.PI / 180;
     const cos = Math.cos(radians);
     const sin = Math.sin(radians);
@@ -104,11 +104,15 @@ export function constrainCropInsideRotatedImage(crop: CropRect, image: Size, ang
             if (sourceY > centerY) scale = Math.min(scale, centerY / sourceY);
         }
     }
+    // Leave room for floating-point arithmetic at the rotated boundary.
+    if (scale < 1) scale *= 1 - 1e-12;
+    const left = centerX + (crop.x - centerX) * scale;
+    const top = centerY + (crop.y - centerY) * scale;
     const constrained = {
-        x: centerX + (crop.x - centerX) * scale,
-        y: centerY + (crop.y - centerY) * scale,
-        width: crop.width * scale,
-        height: crop.height * scale,
+        x: left,
+        y: top,
+        width: Math.min(crop.width * scale, image.width - left),
+        height: Math.min(crop.height * scale, image.height - top),
     };
     if (!snapToPixel) return constrained;
     const x = Math.ceil(constrained.x);
@@ -120,6 +124,48 @@ export function constrainCropInsideRotatedImage(crop: CropRect, image: Size, ang
         height: Math.floor(constrained.y + constrained.height) - y,
     };
     return isValidCrop(snapped, image) ? snapped : constrained;
+}
+
+// Clamp a drag along its path while preserving un-dragged dimensions and resize anchors.
+export function constrainCropDrag(
+    previous: CropRect,
+    requested: CropRect,
+    image: Size,
+    angleDegrees: number,
+    snapToPixel = false,
+): CropRect {
+    const normalize = (crop: CropRect) => snapToPixel ? snapCropToPixels(crop, image) : crop;
+    const start = normalize(previous);
+    if (!isValidCrop(start, image) || !isCropInsideRotatedImage(start, image, angleDegrees)) {
+        return constrainCropInsideRotatedImage(previous, image, angleDegrees);
+    }
+    const finish = normalize(requested);
+    if (!isValidCrop(finish, image)) return { ...start };
+    if (isCropInsideRotatedImage(finish, image, angleDegrees)) return finish;
+
+    let validFraction = 0;
+    let invalidFraction = 1;
+    for (let iteration = 0; iteration < 48; iteration++) {
+        const fraction = (validFraction + invalidFraction) / 2;
+        const candidate = normalize({
+            x: start.x + (finish.x - start.x) * fraction,
+            y: start.y + (finish.y - start.y) * fraction,
+            width: start.width + (finish.width - start.width) * fraction,
+            height: start.height + (finish.height - start.height) * fraction,
+        });
+        if (isValidCrop(candidate, image) && isCropInsideRotatedImage(candidate, image, angleDegrees)) {
+            validFraction = fraction;
+        } else {
+            invalidFraction = fraction;
+        }
+    }
+
+    return normalize({
+        x: start.x + (finish.x - start.x) * validFraction,
+        y: start.y + (finish.y - start.y) * validFraction,
+        width: start.width + (finish.width - start.width) * validFraction,
+        height: start.height + (finish.height - start.height) * validFraction,
+    });
 }
 
 export function previewToImagePoint(

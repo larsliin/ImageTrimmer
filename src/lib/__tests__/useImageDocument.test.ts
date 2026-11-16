@@ -3,6 +3,7 @@ import { registerHooks } from 'node:module';
 import test, { type TestContext } from 'node:test';
 import { effectScope } from 'vue';
 import { defaultCurves } from '../curves.ts';
+import { straightenCrop } from '../straighten.ts';
 
 // Resolve the app's Vite aliases and extensionless imports for Node's TS runner.
 registerHooks({
@@ -117,6 +118,40 @@ test('imports a provided file without opening the picker', async (t) => {
 
     assert.equal(editor.info.value?.fileName, 'dropped.png');
     assert.deepEqual([editor.bitmap.value?.width, editor.bitmap.value?.height], [80, 40]);
+});
+
+test('Straighten applies selected framing as one undoable edit and exports its dimensions', async (t) => {
+    const { editor, rotationAngles, downloads } = setup(t);
+    await editor.importImage();
+    const original = editor.bitmap.value;
+    const crop = { x: 30, y: 10, width: 20, height: 20 };
+    assert.equal(await editor.straightenImage(crop, 90), true);
+    assert.deepEqual(editor.info.value && [editor.info.value.width, editor.info.value.height], [20, 20]);
+    assert.equal(rotationAngles.at(-1), Math.PI / 2);
+    assert.equal(editor.canUndo.value, true);
+    editor.undo();
+    assert.equal(editor.bitmap.value, original);
+    assert.equal(editor.canUndo.value, false, 'angle and crop share one history entry');
+    editor.redo();
+    assert.equal(editor.bitmap.value?.width, 20);
+    await editor.exportImage();
+    assert.equal(downloads.length, 1);
+});
+
+test('Straighten rejects invalid framing/angles without mutating history; zero angle can still crop', async (t) => {
+    const { editor } = setup(t);
+    await editor.importImage();
+    const original = editor.bitmap.value;
+    const initial = straightenCrop({ width: 80, height: 40 }, 5);
+    assert.equal(await editor.straightenImage(initial, 40), false);
+    assert.equal(await editor.straightenImage(initial, 91), false);
+    assert.equal(await editor.straightenImage({ ...initial, width: 0 }, 5), false);
+    assert.equal(editor.bitmap.value, original);
+    assert.equal(editor.canUndo.value, false);
+    assert.equal(await editor.straightenImage({ x: 10, y: 10, width: 20, height: 15 }, 0), true);
+    assert.deepEqual([editor.bitmap.value?.width, editor.bitmap.value?.height], [20, 15]);
+    editor.undo();
+    assert.equal(editor.bitmap.value, original);
 });
 
 test('only the last three edits can be undone and all three can be redone', async (t) => {
