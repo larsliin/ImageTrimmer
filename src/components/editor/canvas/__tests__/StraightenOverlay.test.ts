@@ -15,34 +15,23 @@ const source = await readFile(new URL('../StraightenOverlay.vue', import.meta.ur
 const script = compileScript(parse(source).descriptor, { id: 'straighten-overlay-test', inlineTemplate: true }).content
     .replace("import { BaseIconButton } from 'chrome-extension-component-library';", "const BaseIconButton = 'button';")
     .replace("import CropOverlay from './CropOverlay.vue';", `
+        import { h } from 'vue';
         const CropOverlay = {
-            props: ['angle', 'initialCrop', 'canStraighten'],
+            props: ['angle', 'canStraighten', 'disabled', 'panMode'],
             emits: ['update:angle', 'apply', 'cancel', 'dirty', 'straighten'],
             setup(props, { emit }) {
                 return () => h('test-crop', {
                     angle: props.angle,
-                    initialCrop: props.initialCrop,
+                    valid: Number.isFinite(props.angle) && Math.abs(props.angle) <= 90,
+                    disabled: props.disabled,
+                    panMode: props.panMode,
                     onAngle: value => emit('update:angle', value),
                     onApply: (crop, angle) => emit('apply', crop, angle),
                     onCancel: () => emit('cancel'),
                     onDirty: value => emit('dirty', value),
                 }, [
                     h('button', { 'aria-label': 'Straighten', disabled: !props.canStraighten, onClick: () => emit('straighten') }),
-                ]);
-            },
-        };
-    `)
-    .replace("import StraightenControls from '../controls/StraightenControls.vue';", `
-        import { h } from 'vue';
-        const StraightenControls = {
-            props: ['angle', 'canStraighten', 'canApply', 'valid', 'disabled'],
-            emits: ['update:angle', 'straighten', 'apply', 'cancel'],
-            setup(props, { emit }) {
-                return () => h('test-controls', {
-                    angle: props.angle, valid: props.valid, onAngle: value => emit('update:angle', value),
-                }, [
-                    h('button', { 'aria-label': 'Straighten', disabled: !props.canStraighten, onClick: () => emit('straighten') }),
-                    h('button', { 'aria-label': 'Apply straighten', disabled: !props.canApply, onClick: () => emit('apply') }),
+                    h('button', { 'aria-label': 'Apply straighten', onClick: () => emit('apply') }),
                     h('button', { 'aria-label': 'Cancel straighten', onClick: () => emit('cancel') }),
                 ]);
             },
@@ -272,17 +261,16 @@ test('completed line and endpoints stay on the transformed preview through angle
             assert.ok(controls);
             const updateAngle = controls.props.onAngle;
             assert.ok(typeof updateAngle === 'function');
-            const initializedCrop = controls.props.initialCrop;
-            assert.deepEqual(initializedCrop, straightenCrop({ width: 800, height: 600 }, -26.57));
+            assert.equal(controls.props.initialCrop, undefined, 'shared overlay owns automatic framing from entry');
             for (const angle of [15, -40, 0]) {
                 updateAngle(angle);
                 await nextTick();
                 assert.equal(previews.at(-1), angle);
-                assert.deepEqual(controls.props.initialCrop, initializedCrop, 'angle edits never reinitialize the crop');
+                assert.equal(surface.children.find(child => child.type === 'test-crop'), controls, 'angle edits never remount framing');
                 assertGuide(root, start, end, angle, 2);
             }
             assert.equal(findAll(root, 'straighten-handle').length, 0, 'framing uses shared crop handles, not rotate buttons');
-            assert.deepEqual(buttons(root).map(button => button.props['aria-label']), ['Straighten'], 'framing keeps Straighten without Redraw or Reset');
+            assert.deepEqual(buttons(root).map(button => button.props['aria-label']), ['Straighten', 'Apply straighten', 'Cancel straighten'], 'one continuous toolbar without Redraw or Reset');
             assert.equal(typeof controls.props.onCancel, 'function');
         } finally {
             app.unmount();
@@ -290,7 +278,7 @@ test('completed line and endpoints stay on the transformed preview through angle
     }
 });
 
-test('keyboard measurement transitions once; Apply forwards selected crop and angle, Cancel never applies', async (t) => {
+test('keyboard measurement preserves the frame; Apply forwards selected crop and angle, Cancel never applies', async (t) => {
     const root = element('root');
     const applied: unknown[] = [];
     let cancellations = 0;
@@ -319,12 +307,14 @@ test('keyboard measurement transitions once; Apply forwards selected crop and an
         await nextTick();
     };
     await key('Enter');
-    await key('Enter'); // coincident points must not initialize a crop
-    assert.equal(surface.children.find(child => child.type === 'test-crop'), undefined);
+    await key('Enter'); // coincident points must not complete the guide
+    const initialFrame = surface.children.find(child => child.type === 'test-crop');
+    assert.ok(initialFrame, 'frame is present even with an invalid guide');
     await key('ArrowRight', true);
     await key('ArrowDown', true);
     await key('Enter');
-    assert.equal(surface.children.find(child => child.type === 'test-crop'), undefined, 'Enter placing the second point does not straighten');
+    assert.equal(surface.children.find(child => child.type === 'test-crop'), initialFrame, 'Enter placing the second point does not remount the frame');
+    assert.equal(initialFrame.props.angle, 0, 'Enter placing the second point does not straighten');
     assert.deepEqual(applied, []);
     assert.ok(clickButton(root, 'Straighten'));
     await nextTick();
@@ -367,7 +357,7 @@ test('partial line follows the cursor and keeps its first point until cancellati
         dispatch(surface, 'onPointermove', 350, 260);
         await nextTick();
         assertGuide(root, { x: 200, y: 200 }, { x: 500, y: 360 }, 0, 1);
-        const controls = surface.children.find(child => child.type === 'test-controls');
+        const controls = surface.children.find(child => child.type === 'test-crop');
         assert.ok(controls);
         assert.deepEqual(buttons(controls).map(button => button.props['aria-label']), ['Straighten', 'Apply straighten', 'Cancel straighten']);
         assert.equal(clickButton(root, 'Straighten'), false, 'disabled until the line is complete');
@@ -412,7 +402,7 @@ test('a pointer drag previews and records both source-space endpoints at multipl
             const surface = root.children[0];
             assert.ok(surface);
             surface.bounds = scenario.bounds;
-            const controls = surface.children.find(child => child.type === 'test-controls');
+            const controls = surface.children.find(child => child.type === 'test-crop');
             const setAngle = controls?.props.onAngle;
             assert.ok(typeof setAngle === 'function');
             setAngle(scenario.angle);
@@ -447,7 +437,7 @@ test('a pointer drag previews and records both source-space endpoints at multipl
             assert.equal(findAll(root, 'straighten-point').length, 2);
             assert.deepEqual(previews, [], 'placing a drag does not change the preview angle');
             assert.deepEqual(applied, [], 'placing a drag does not commit the image');
-            assert.equal(surface.children.find(child => child.type === 'test-crop'), undefined, 'framing is still explicit');
+            assert.equal(surface.children.find(child => child.type === 'test-crop'), controls, 'guide drawing retains the existing frame');
 
             dispatchCompatibilityClick(surface, end.x, end.y);
             await nextTick();
@@ -455,7 +445,7 @@ test('a pointer drag previews and records both source-space endpoints at multipl
             assert.equal(clickButton(root, 'Straighten'), true);
             await nextTick();
             assert.equal(previews.at(-1), levelingAngle(sourceStart, sourceEnd));
-            assert.ok(surface.children.find(child => child.type === 'test-crop'), 'only the Straighten action starts framing');
+            assert.equal(surface.children.find(child => child.type === 'test-crop'), controls, 'Straighten levels without remounting framing');
         } finally {
             app.unmount();
         }
@@ -474,7 +464,7 @@ test('dragging a second endpoint retains its existing anchor and click sequences
         assert.ok(surface);
         const image = { width: 800, height: 600 };
         const angle = 24;
-        const controls = surface.children.find(child => child.type === 'test-controls');
+        const controls = surface.children.find(child => child.type === 'test-crop');
         const setAngle = controls?.props.onAngle;
         assert.ok(typeof setAngle === 'function');
         setAngle(angle);
@@ -558,7 +548,7 @@ test('minimum guide length uses actual displayed endpoints after manual rotation
         const surface = root.children[0];
         assert.ok(surface);
         surface.bounds = { left: 100, top: 80, width: 400, height: 400 };
-        const controls = surface.children.find(child => child.type === 'test-controls');
+        const controls = surface.children.find(child => child.type === 'test-crop');
         const setAngle = controls?.props.onAngle;
         assert.ok(typeof setAngle === 'function');
         setAngle(-90);
@@ -575,6 +565,43 @@ test('minimum guide length uses actual displayed endpoints after manual rotation
     } finally {
         app.unmount();
     }
+});
+
+test('guide gestures ignore bubbled handle events and keep exclusive pointer ownership', async (t) => {
+    const root = element('root');
+    const previews: number[] = [];
+    const app = renderer.createApp(overlay, {
+        image: { width: 800, height: 600 }, disabled: false, panMode: false,
+        onPreview: (value: number) => previews.push(value),
+    });
+    t.after(() => app.unmount());
+    mockWindow(t);
+    app.mount(root);
+    const surface = root.children[0];
+    const frame = surface?.children.find(node => node.type === 'test-crop');
+    assert.ok(surface && frame);
+    for (const name of ['onPointerdown', 'onPointermove', 'onClick']) {
+        const handler = surface.props[name];
+        assert.ok(typeof handler === 'function');
+        handler({
+            button: 0, detail: 1, pointerId: 7, clientX: 200, clientY: 180,
+            target: frame, currentTarget: surface, preventDefault() {}, stopPropagation() {},
+        });
+    }
+    await nextTick();
+    assert.equal(surface.capturedPointer, null, 'rotation never starts guide capture');
+    assert.equal(findAll(root, 'straighten-point').length, 0, 'rotation compatibility clicks never place a point');
+    dispatchPointer(surface, 'onPointerdown', 200, 180);
+    await nextTick();
+    assert.equal(frame.props.disabled, true, 'guide capture disables rotation and Apply');
+    dispatchPointer(surface, 'onPointerdown', 400, 280, { pointerId: 8 });
+    assert.equal(surface.capturedPointer, 7, 'another pointer cannot take over a guide');
+    dispatchPointer(surface, 'onPointermove', 400, 280);
+    dispatchPointer(surface, 'onPointerup', 400, 280);
+    await nextTick();
+    assert.equal(frame.props.disabled, false);
+    assertGuide(root, { x: 200, y: 200 }, { x: 600, y: 400 }, 0, 2);
+    assert.deepEqual(previews, [], 'guide completion never rotates');
 });
 
 test('cancel, lost capture, pan, and disabled transitions restore an in-progress drag', async (t) => {
@@ -637,7 +664,7 @@ test('cancel, lost capture, pan, and disabled transitions restore an in-progress
 
         dispatchPointer(surface, 'onPointerdown', 201, 181);
         dispatchPointer(surface, 'onPointermove', 300, 240);
-        const controls = surface.children.find(child => child.type === 'test-controls');
+        const controls = surface.children.find(child => child.type === 'test-crop');
         const setAngle = controls?.props.onAngle;
         assert.ok(typeof setAngle === 'function');
         setAngle(15);
@@ -674,13 +701,13 @@ test('coincident reference points stay in placement stage until a valid second p
         dispatch(surface, 'onClick', 200, 180);
         dispatch(surface, 'onClick', 200, 180);
         await nextTick();
-        assert.equal(surface.children.find(child => child.type === 'test-crop'), undefined);
+        assert.ok(surface.children.find(child => child.type === 'test-crop'), 'invalid guide does not hide the frame');
         assert.equal(findAll(root, 'straighten-point').length, 1);
 
         assert.equal(clickButton(root, 'Straighten'), false);
         dispatch(surface, 'onClick', 400, 280);
         await nextTick();
-        assert.equal(surface.children.find(child => child.type === 'test-crop'), undefined);
+        assert.equal(surface.children.find(child => child.type === 'test-crop')?.props.angle, 0, 'valid guide still does not rotate');
         assert.ok(clickButton(root, 'Straighten'));
         await nextTick();
         assert.ok(surface.children.find(child => child.type === 'test-crop'));
@@ -770,7 +797,7 @@ test('rotation cursors share the exact quarter-arc art, contrast and centered ho
     }
 });
 
-test('real controls gate Apply by output in both stages, preserve guide/framing intent, and isolate ordinary Crop', async (t) => {
+test('real controls keep an immediate frame, gate Apply by output, preserve guide intent, and isolate ordinary Crop', async (t) => {
     let app: ReturnType<typeof renderer.createApp> | undefined;
     t.after(() => app?.unmount());
     mockWindow(t);
@@ -808,7 +835,6 @@ test('real controls gate Apply by output in both stages, preserve guide/framing 
     const cropUrl = await componentUrl('../CropOverlay.vue', { '../controls/CropControls.vue': controlsUrl });
     const overlayUrl = await componentUrl('../StraightenOverlay.vue', {
         './CropOverlay.vue': cropUrl,
-        '../controls/StraightenControls.vue': await componentUrl('../../controls/StraightenControls.vue', fields),
     });
     const { default: realOverlay }: { default: Component } = await import(overlayUrl);
     const root = element('root');
@@ -829,7 +855,7 @@ test('real controls gate Apply by output in both stages, preserve guide/framing 
     assert.ok(surface);
     function applyButton() {
         const matches = buttons(root).filter(button => button.props['aria-label'] === 'Apply straighten');
-        assert.equal(matches.length, 1, 'exactly one Apply action in either stage');
+        assert.equal(matches.length, 1, 'exactly one Apply action throughout editing');
         const button = matches[0];
         assert.ok(button);
         assert.equal(button.props.title, 'Apply straighten');
@@ -861,7 +887,7 @@ test('real controls gate Apply by output in both stages, preserve guide/framing 
         assert.deepEqual(applied.at(-1), [
             constrainCropInsideRotatedImage(straightenCrop(image, degrees), image, degrees), degrees,
         ], 'direct Apply uses the same canonical auto-crop and angle as framing');
-        assert.equal(findAll(root, 'crop-surface').length, 0, 'direct Apply never initializes framing');
+        assert.equal(findAll(root, 'crop-surface').length, 1, 'direct Apply retains the frame mounted on entry');
         assert.equal(findAll(root, 'straighten-point').length, 0, 'direct Apply never initializes a guide');
         assert.equal(root.children[0], surface);
     }
@@ -877,7 +903,7 @@ test('real controls gate Apply by output in both stages, preserve guide/framing 
     input('Straighten angle in degrees', '7');
     busy.value = true;
     await nextTick();
-    assert.equal(applyButton().props.disabled, true);
+    assert.ok(all(root).some(node => node.type === 'fieldset' && node.props.disabled === true));
     submit();
     enterAngle('Straighten angle in degrees');
     assert.deepEqual(applied, [], 'busy direct submission cannot commit');
@@ -900,7 +926,14 @@ test('real controls gate Apply by output in both stages, preserve guide/framing 
         return button;
     }
     assert.equal(straightenButton().props.disabled, true);
-    assert.equal(findAll(root, 'crop-handle').length, 0, 'handles are absent before placing a reference');
+    assert.equal(findAll(root, 'crop-handle').length, 4, 'rotation-only handles are present before placing a reference');
+    const entryFrame = findAll(root, 'crop-surface')[0];
+    assert.ok(entryFrame);
+    assert.equal(entryFrame.props.tabindex, -1, 'guide surface, not the visual frame, is the image tab stop');
+    assert.equal(surface.props.tabindex, '0');
+    assert.deepEqual(findAll(root, 'crop-selection')[0]?.props.style, {
+        left: '0%', top: '0%', width: '100%', height: '100%',
+    });
     dispatch(surface, 'onClick', 200, 180);
     await nextTick();
     assert.equal(applyButton().props.disabled, true, 'one point alone cannot apply');
@@ -914,14 +947,15 @@ test('real controls gate Apply by output in both stages, preserve guide/framing 
     await nextTick();
     assert.equal(applyButton().props.disabled, true);
     previews.length = 0;
-    assert.equal(findAll(root, 'crop-handle').length, 0, 'one point is not enough to enter framing');
+    assert.equal(findAll(root, 'crop-handle').length, 4, 'partial guide retains handles');
     dispatch(surface, 'onClick', 200, 180);
     await nextTick();
-    assert.equal(findAll(root, 'crop-handle').length, 0, 'coincident points do not enter framing');
+    assert.equal(findAll(root, 'crop-handle').length, 4, 'coincident points retain handles');
     assert.equal(surface.children.find(child => child.type === 'test-crop'), undefined);
     dispatch(surface, 'onClick', 400, 280);
     await nextTick();
-    assert.equal(findAll(root, 'crop-handle').length, 0, 'second point alone does not enter framing');
+    assert.equal(findAll(root, 'crop-handle').length, 4, 'complete guide retains handles without rotating');
+    assert.equal(findAll(root, 'crop-surface')[0], entryFrame);
     assert.deepEqual(previews, []);
     assert.equal(straightenButton().props.disabled, false);
     assert.equal(applyButton().props.disabled, true, 'complete uncorrected guide alone cannot apply');
@@ -1017,16 +1051,16 @@ test('real controls gate Apply by output in both stages, preserve guide/framing 
         stopPropagation() {},
     });
     const start = { x: 400, y: 300 };
-    const dispatchPointer = (name: string, event: object) => {
+    const dispatchRotationPointer = (name: string, event: object) => {
         const handler = cropSurface.props[name];
         assert.ok(typeof handler === 'function');
         Reflect.apply(handler, undefined, [event]);
     };
     // Interior/outside presses are inert: no drag state, so reapply stays available.
-    dispatchPointer('onPointerdown', pointerEvent('pointerdown', start));
+    dispatchRotationPointer('onPointerdown', pointerEvent('pointerdown', start));
     await nextTick();
     assert.equal(straightenButton().props.disabled, false, 'interior press does not start a drag');
-    dispatchPointer('onPointerup', pointerEvent('pointerup', start));
+    dispatchRotationPointer('onPointerup', pointerEvent('pointerup', start));
     // A corner rotation drag (returned to its start) blocks reapply while active.
     const dragHandle = rotationHandle?.props.onPointerdown;
     assert.ok(typeof dragHandle === 'function');
@@ -1042,8 +1076,8 @@ test('real controls gate Apply by output in both stages, preserve guide/framing 
     forceClick();
     await nextTick();
     assert.equal(previews.at(-1), -63.4, 'guard blocks even a forced disabled click during drag');
-    dispatchPointer('onPointermove', pointerEvent('pointermove', start));
-    dispatchPointer('onPointerup', pointerEvent('pointerup', start));
+    dispatchRotationPointer('onPointermove', pointerEvent('pointermove', start));
+    dispatchRotationPointer('onPointerup', pointerEvent('pointerup', start));
     await nextTick();
     const image = { width: 800, height: 600 };
     const chosen = auto;
@@ -1193,16 +1227,37 @@ test('real controls gate Apply by output in both stages, preserve guide/framing 
     assert.equal(rotationSurface.capturedPointer, null, 'disabled handles cannot begin rotation');
     busy.value = false;
     await nextTick();
+    const beforePanAngle = all(root).find(node => node.props['aria-label'] === 'Straighten angle in degrees')?.props.value;
     dispatch(firstCorner, 'onPointerdown', 200, 180);
+    dispatch(rotationSurface, 'onPointermove', 300, 180);
     await nextTick();
+    assert.equal(rotationSurface.capturedPointer, 7);
     panning.value = true;
     await nextTick();
     assert.equal(cursorOf(rotationSurface), undefined, 'pan cursor takes priority over active rotation');
     assert.equal(findAll(root, 'crop-handle').length, 0);
-    dispatch(rotationSurface, 'onPointercancel', 200, 180);
+    assert.equal(rotationSurface.capturedPointer, null, 'entering pan releases rotation capture');
+    dispatch(rotationSurface, 'onPointermove', 400, 180);
+    dispatch(rotationSurface, 'onPointerup', 400, 180);
+    await nextTick();
+    assert.equal(all(root).find(node => node.props['aria-label'] === 'Straighten angle in degrees')?.props.value,
+        beforePanAngle, 'pan restores the pre-gesture angle and prevents further rotation');
     panning.value = false;
     await nextTick();
     assertHoverCursors();
+    const restoredCorner = findAll(root, 'crop-handle')[0];
+    assert.ok(restoredCorner);
+    dispatch(restoredCorner, 'onPointerdown', 200, 180);
+    dispatch(rotationSurface, 'onPointermove', 300, 180);
+    await nextTick();
+    busy.value = true;
+    await nextTick();
+    assert.equal(rotationSurface.capturedPointer, null, 'processing also releases rotation capture');
+    dispatch(rotationSurface, 'onPointerup', 400, 180);
+    await nextTick();
+    assert.equal(all(root).find(node => node.props['aria-label'] === 'Straighten angle in degrees')?.props.value,
+        beforePanAngle, 'processing cannot finish a stale rotation');
+    busy.value = false;
 
     // An inert interior press must not alter automatic fit across reapply/zero cycles.
     app.unmount();
@@ -1253,53 +1308,74 @@ test('real controls gate Apply by output in both stages, preserve guide/framing 
             left: '0%', top: '0%', width: '100%', height: '100%',
         }, 'returning to zero restores full frame without cumulative shrink');
     }
-});
 
-test('measurement handler independently rejects no-op, invalid, busy and invalid-crop requests', async (t) => {
-    mockWindow(t);
-    for (const image of [{ width: 800, height: 600 }, { width: 600, height: 800 }, { width: 0, height: 0 }]) {
-        const busy = shallowRef(false);
-        const applied: unknown[] = [];
-        const root = element('root');
-        const app = renderer.createApp({
-            setup: () => () => h(overlay, {
-                image, disabled: busy.value, panMode: false,
-                onApply: (...args: unknown[]) => applied.push(args),
-            }),
+    // Both pointer and keyboard corner rotation work before and after the optional guide.
+    for (const image of [{ width: 800, height: 600 }, { width: 600, height: 900 }]) {
+        app.unmount();
+        const dirty: boolean[] = [];
+        previews.length = 0;
+        app = renderer.createApp(realOverlay, {
+            image, disabled: false, panMode: false,
+            onPreview: (angle: number) => previews.push(angle),
+            onDirty: (value: boolean) => dirty.push(value),
         });
         app.mount(root);
-        try {
-            const surface = root.children[0];
-            const controls = surface?.children.find(node => node.type === 'test-controls');
-            const setAngle = controls?.props.onAngle;
-            assert.ok(typeof setAngle === 'function');
-            // This stub always emits, even when disabled: exercise the owning handler, not just the UI.
-            const forcedApply = buttons(root).find(node => node.props['aria-label'] === 'Apply straighten')?.props.onClick;
-            assert.ok(typeof forcedApply === 'function');
-            for (const angle of [0, Number.NaN, Number.POSITIVE_INFINITY, -91, 91]) {
-                setAngle(angle);
-                await nextTick();
-                forcedApply();
-                assert.deepEqual(applied, []);
-            }
-            setAngle(12.3);
-            busy.value = true;
-            await nextTick();
-            forcedApply();
-            assert.deepEqual(applied, []);
-            busy.value = false;
-            await nextTick();
-            forcedApply();
-            assert.deepEqual(applied, image.width === 0 ? [] : [[
-                constrainCropInsideRotatedImage(straightenCrop(image, 12.3), image, 12.3), 12.3,
-            ]]);
-        } finally {
-            app.unmount();
-        }
+        const guideSurface = root.children[0];
+        const frame = findAll(root, 'crop-surface')[0];
+        const handle = findAll(root, 'crop-handle')[0];
+        assert.ok(guideSurface && frame && handle);
+        assert.notEqual(dirty.at(-1), true, 'the entry frame is not an edit');
+        assert.equal(applyButton().props.disabled, true);
+        const pointer = (type: string, x: number, y: number) => ({
+            type, pointerId: 7, button: 0, isPrimary: true, shiftKey: false,
+            clientX: x, clientY: y, currentTarget: frame, target: frame,
+            preventDefault() {}, stopPropagation() {},
+        });
+        const begin = handle.props.onPointerdown;
+        const move = frame.props.onPointermove;
+        const finish = frame.props.onPointerup;
+        assert.ok(typeof begin === 'function' && typeof move === 'function' && typeof finish === 'function');
+        begin(pointer('pointerdown', 110, 90));
+        move(pointer('pointermove', 180, 90));
+        finish(pointer('pointerup', 180, 90));
+        await nextTick();
+        const rotated = previews.at(-1);
+        assert.ok(rotated && Math.abs(rotated) > 1, 'a corner drag rotates immediately without a guide');
+        assert.equal(applyButton().props.disabled, false);
+        assert.equal(findAll(root, 'straighten-point').length, 0);
+        assert.equal(dirty.at(-1), true);
+
+        const start = { x: image.width / 4, y: image.height / 3 };
+        const end = { x: image.width * 3 / 4, y: image.height * 2 / 3 };
+        const client = (point: { x: number, y: number }) => ({
+            x: 100 + point.x / image.width * 400,
+            y: 80 + point.y / image.height * 300,
+        });
+        const firstClient = client(start);
+        const secondClient = client(end);
+        const beforeGuide = [...previews];
+        dispatchPointer(guideSurface, 'onPointerdown', firstClient.x, firstClient.y);
+        dispatchPointer(guideSurface, 'onPointermove', secondClient.x, secondClient.y);
+        dispatchPointer(guideSurface, 'onPointerup', secondClient.x, secondClient.y);
+        await nextTick();
+        assert.deepEqual(previews, beforeGuide, 'drawing after corner rotation does not level the preview');
+        const first = straightenedToSourcePoint(start, image, rotated);
+        const second = straightenedToSourcePoint(end, image, rotated);
+        assertGuideForImage(root, image, first, second, rotated);
+        const key = handle.props.onKeydown;
+        assert.ok(typeof key === 'function');
+        key({ key: 'ArrowRight', shiftKey: true, preventDefault() {}, stopPropagation() {} });
+        await nextTick();
+        const adjusted = previews.at(-1);
+        assert.ok(adjusted !== undefined);
+        assert.equal(adjusted, Math.round((rotated + 1) * 100) / 100);
+        assertGuideForImage(root, image, first, second, adjusted);
+        assert.equal(findAll(root, 'crop-surface')[0], frame, 'frame identity survives both workflows');
+        assert.equal(findAll(root, 'crop-handle').length, 4, 'only existing corner handles are used');
     }
 });
 
-test('Straighten controls are visible on entry; the action stays disabled until a valid line exists', async (t) => {
+test('Straighten frame and controls are visible on entry; the action stays disabled until a valid line exists', async (t) => {
     const root = element('root');
     const app = renderer.createApp(overlay, { image: { width: 800, height: 600 }, disabled: false, panMode: false });
     t.after(() => app.unmount());
@@ -1307,7 +1383,7 @@ test('Straighten controls are visible on entry; the action stays disabled until 
     app.mount(root);
     const surface = root.children[0];
     assert.ok(surface);
-    const controls = surface.children.find(child => child.type === 'test-controls');
+    const controls = surface.children.find(child => child.type === 'test-crop');
     assert.ok(controls);
     assert.equal(controls.props.angle, 0);
     assert.equal(controls.props.valid, true);
@@ -1315,7 +1391,7 @@ test('Straighten controls are visible on entry; the action stays disabled until 
     dispatch(surface, 'onClick', 200, 180);
     await nextTick();
     assert.equal(clickButton(root, 'Straighten'), false, 'one point is not a line');
-    assert.match(await readFile(new URL('../../controls/StraightenControls.vue', import.meta.url), 'utf8'),
+    assert.match(await readFile(new URL('../../controls/CropControls.vue', import.meta.url), 'utf8'),
         /BaseRangeInput[\s\S]*Straighten angle slider[\s\S]*BaseNumberInput[\s\S]*Straighten angle in degrees[\s\S]*BaseIconButton[\s\S]*title="Straighten"/);
 });
 
@@ -1335,7 +1411,7 @@ test('guide alignment uses the current angle modulo 180 with rounding tolerance 
                 app.mount(root);
                 const surface = root.children[0];
                 assert.ok(surface);
-                const controls = surface.children.find(child => child.type === 'test-controls');
+                const controls = surface.children.find(child => child.type === 'test-crop');
                 const setAngle = controls?.props.onAngle;
                 assert.ok(typeof setAngle === 'function');
                 const radians = degrees * Math.PI / 180;
@@ -1359,7 +1435,7 @@ test('guide alignment uses the current angle modulo 180 with rounding tolerance 
                 forcedClick();
                 await nextTick();
                 assert.deepEqual(previews, before, 'aligned action emits no preview');
-                assert.equal(surface.children.find(child => child.type === 'test-crop'), undefined, 'aligned action cannot initialize a crop');
+                assert.equal(surface.children.find(child => child.type === 'test-crop'), controls, 'aligned action retains the existing frame');
 
                 if (Math.abs(correction) === 90) {
                     setAngle(-correction);
@@ -1408,7 +1484,7 @@ test('manual angle previews before measuring; clicks map back to source so Strai
     app.mount(root);
     const surface = root.children[0];
     assert.ok(surface);
-    const controls = surface.children.find(child => child.type === 'test-controls');
+    const controls = surface.children.find(child => child.type === 'test-crop');
     const setAngle = controls?.props.onAngle;
     assert.ok(typeof setAngle === 'function');
     setAngle(20);
@@ -1425,7 +1501,7 @@ test('manual angle previews before measuring; clicks map back to source so Strai
         y: 300 + (x - 400) * Math.sin(rad) + (y - 300) * Math.cos(rad),
     }));
     assert.deepEqual(previews, [20], 'completing the line keeps the current preview');
-    assert.equal(surface.children.find(child => child.type === 'test-crop'), undefined);
+    assert.equal(surface.children.find(child => child.type === 'test-crop'), controls, 'manual rotation and guide share the entry frame');
     assertGuide(root, sources[0] ?? displays[0]!, sources[1] ?? displays[1]!, 20, 2);
     assert.ok(clickButton(root, 'Straighten'));
     await nextTick();
@@ -1434,8 +1510,7 @@ test('manual angle previews before measuring; clicks map back to source so Strai
     const expected = -Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
     assert.equal(previews.length, 2, 'Straighten starts exactly one preview update');
     assert.ok(Math.abs((previews.at(-1) ?? 0) - expected) < 0.01);
-    const crop = surface.children.find(child => child.type === 'test-crop');
-    assert.deepEqual(crop?.props.initialCrop, straightenCrop({ width: 800, height: 600 }, previews.at(-1) ?? 0));
+    assert.equal(surface.children.find(child => child.type === 'test-crop'), controls, 'leveling never remounts the frame');
 });
 
 test('manual pre-line edits route Cancel and Escape through the dirty close guard without applying', async (t) => {
@@ -1460,7 +1535,7 @@ test('manual pre-line edits route Cancel and Escape through the dirty close guar
 
         const surface = root.children[0];
         assert.ok(surface);
-        const controls = surface.children.find(child => child.type === 'test-controls');
+        const controls = surface.children.find(child => child.type === 'test-crop');
         const setAngle = controls?.props.onAngle;
         assert.ok(typeof setAngle === 'function');
         setAngle(12);
@@ -1508,7 +1583,7 @@ test('invalid manual angle never previews but measuring still works; busy state 
     app.mount(root);
     const surface = root.children[0];
     assert.ok(surface);
-    const controls = surface.children.find(child => child.type === 'test-controls');
+    const controls = surface.children.find(child => child.type === 'test-crop');
     const setAngle = controls?.props.onAngle;
     assert.ok(typeof setAngle === 'function');
     setAngle(120);

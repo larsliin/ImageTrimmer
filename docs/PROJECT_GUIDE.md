@@ -99,8 +99,13 @@ Use **Straighten** to level a tilted horizon, wall, or other line that should be
 horizontal. It is separate from the angle slider in Crop, which still works as
 before.
 
-1. Select **Straighten** from the left toolbar.
-2. Set a reference line by clicking two distinct points along an edge that
+1. Select **Straighten** from the left toolbar. The frame and its four
+   rotation-only corner handles appear immediately, along with the Angle
+   slider, degree field, and **Apply straighten**. Drag a corner to rotate
+   the image around its center, or set an angle directly. The crop fits inside
+   the rotated image automatically; there are no crop-resize handles.
+2. Optionally set a reference line, before or after manually rotating, by
+   clicking two distinct points elsewhere on the image along an edge that
    should be level, or press and drag from the first point to the second, then
    release. The order of the points does not matter. Pointer movement of
    3 pixels or less counts as a click; a longer drag whose line is shorter
@@ -108,17 +113,16 @@ before.
    apart. For keyboard placement, focus the image, use the arrow keys to
    position each point, and press **Enter** after each one; hold **Shift** with
    an arrow key to move farther.
-3. The Angle slider, degree field, and **Apply straighten** are available as soon
-   as Straighten opens. You can set a manual angle and apply directly without a
-   reference line; the automatic crop fits inside the rotated image.
-   Setting the second valid point only records the line; it does not rotate the
-   image or start framing. Select the **Straighten** icon in the toolbar (it stays
+   Hold **Space** to pan instead; entering pan cancels an active guide or
+   corner-rotation gesture.
+3. Setting the second valid point only records the line; it does not rotate the
+   image. You can then manually rotate or select the **Straighten** icon in the toolbar (it stays
    disabled until the line is complete and is not already level) to level the
-   measured line and initialize a crop inside the rotated image. If you rotated
+   measured line. If you rotated
    the preview manually first, the line is still measured against the image itself.
-   The frame has four corner handles, used only to rotate
-   the image around its stable center; dragging inside or outside the crop does
-   nothing (use the Crop tool for a custom crop). There are no side-resize handles. The Crop **Snap to pixel** preference does not
+   Drawing inside or outside the frame sets the guide, never moves or resizes
+   the crop (use the Crop tool for a custom crop). The frame, grid, and shading
+   do not block guide drawing. The Crop **Snap to pixel** preference does not
    affect Straighten. Corner rotation fits the crop inside the rotated image.
    Nothing is committed until **Apply straighten**.
 4. Fine-tune the angle with the slider, degree field, or four rotation
@@ -133,7 +137,7 @@ before.
    enabled only when the current valid crop or angle changes the resulting image.
    A reference line alone is not an edit to apply. Returning to the full frame
    at 0° disables Apply, even after earlier edits. Invalid angles and active
-   processing or framing drags block Apply.
+   processing, guide drags, or corner-rotation drags block Apply.
    Select **Apply straighten** (or press **Enter** in an angle control) to commit,
    or **Cancel** (or **Escape**) to discard the preview. Cancel and reopen
    Straighten to start over. The image changes only when you apply.

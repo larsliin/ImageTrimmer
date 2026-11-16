@@ -75,6 +75,32 @@ function pointer(x: number, y: number, type = 'pointermove'): PointerEvent {
     } as PointerEvent;
 }
 
+test('Straighten Apply rejects unchanged, invalid, busy and invalid-image output without a guide', async (t) => {
+    for (const image of [{ width: 800, height: 600 }, { width: 600, height: 900 }, { width: 0, height: 0 }]) {
+        for (const disabled of [false, true]) {
+            const applied: unknown[] = [];
+            const app = renderer.createApp({ ...overlay, render: () => null }, {
+                image, straighten: true, disabled, panMode: false,
+                onApply: (...args: unknown[]) => applied.push(args),
+            });
+            const state = app.mount({}) as CropState;
+            t.after(() => app.unmount());
+            for (const angle of [0, Number.NaN, Number.POSITIVE_INFINITY, -91, 91]) {
+                state.angle = angle;
+                await nextTick();
+                state.apply();
+                assert.deepEqual(applied, []);
+            }
+            state.angle = 12.3;
+            await nextTick();
+            state.apply();
+            assert.deepEqual(applied, disabled || image.width === 0 ? [] : [[
+                constrainCropInsideRotatedImage(straightenCrop(image, 12.3), image, 12.3), 12.3,
+            ]]);
+        }
+    }
+});
+
 for (const handle of ['nw', 'ne', 'se', 'sw'] as const) {
     test(`Straighten ${handle} rotates about source center without changing framing intent`, async (t) => {
         const image = { width: 800, height: 600 };

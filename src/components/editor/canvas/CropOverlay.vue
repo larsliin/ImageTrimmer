@@ -1,6 +1,6 @@
 <script setup lang="ts">
     import { useToolDraft } from '@/composables/useToolDraft';
-    import { computed, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
+    import { computed, ref, shallowRef, useTemplateRef, watch } from 'vue';
     import { isValidLevelAngle, MAX_LEVEL_ANGLE, straightenCrop } from '@/lib/straighten';
     import { rotationCursors } from '@/lib/rotationCursors';
     import { cropFromPoints, squareCropFromPoints, moveCrop, resizeCrop, snapCropToPixels, isValidCrop, previewToImagePoint, isCropInsideRotatedImage, isValidAngle, largestCropInsideRotatedImage, constrainCropInsideRotatedImage, constrainCropDrag, type CropRect, type CropHandle, type Point } from '@/lib/crop';
@@ -14,7 +14,6 @@
         initialCrop?: CropRect
         straighten?: boolean
         canStraighten?: boolean
-        focusOnMount?: boolean
     }>();
 
     const angle = defineModel<number>('angle', { default: 0 });
@@ -73,9 +72,6 @@
             else if (isValidCrop(value, props.image)) framingIntent.value = { ...value };
         },
     });
-    onMounted(() => {
-        if (props.focusOnMount) surface.value?.focus({ preventScroll: true });
-    });
     useToolDraft(() => ({
         tool: 'crop', rect: props.straighten ? framingIntent.value ?? crop.value : crop.value, angle: angle.value,
     }), value => emit('dirty', value));
@@ -105,6 +101,9 @@
     let previousCrop: CropRect | null = null;
     let previousIntent: CropRect | null = null;
     let previousAngle = 0;
+    watch(() => props.straighten && (props.disabled || props.panMode), (blocked) => {
+        if (blocked) endSelection();
+    }, { flush: 'sync' });
 
     function isRotationHandle(handle: CropHandle): boolean {
         return !!props.straighten && handle.length === 2;
@@ -261,13 +260,13 @@
         if (event.key === 'Shift') updateConstraint(event.shiftKey);
     }
 
-    function endSelection(event: PointerEvent) {
-        if (event.pointerId !== pointerId) return;
-        if (event.type === 'pointerup') updateSelection(event);
-        if (event.type !== 'pointerup' && props.straighten) {
+    function endSelection(event?: PointerEvent) {
+        if (pointerId === null || (event && event.pointerId !== pointerId)) return;
+        if (event?.type === 'pointerup') updateSelection(event);
+        if (event?.type !== 'pointerup' && props.straighten) {
             framingIntent.value = previousIntent;
             angle.value = previousAngle;
-        } else if ((event.type !== 'pointerup' || !valid.value) && previousCrop) {
+        } else if ((event?.type !== 'pointerup' || !valid.value) && previousCrop) {
             crop.value = previousCrop;
         }
         const capturedId = pointerId;
@@ -332,7 +331,7 @@
         class="crop-surface"
         :class="{ 'is-panning': panMode, 'is-straighten': straighten, 'is-moving': moving, 'is-rotating': !!activeRotationCursor }"
         :style="{ cursor: activeRotationCursor }"
-        tabindex="0"
+        :tabindex="straighten ? -1 : 0"
         :aria-label="straighten
             ? 'Straighten framing. Drag a corner or adjust the angle to rotate; the crop fits automatically. Enter applies; Escape cancels.'
             : 'Crop selection. Drag inside to move or outside to select. Hold Shift for square. Enter applies; Escape cancels.'"

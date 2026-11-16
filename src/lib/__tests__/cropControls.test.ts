@@ -144,7 +144,7 @@ async function loadRecordingControls(file: string): Promise<Component> {
     return (await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`)).default as Component;
 }
 
-test('Straighten measurement and framing toolbars are not scrollable; ordinary Crop is unchanged', async (t) => {
+test('Straighten toolbar is not scrollable; ordinary Crop is unchanged', async (t) => {
     const globals = globalThis as unknown as { toolbarAttrs: Record<string, unknown>[] };
     globals.toolbarAttrs = [];
     t.after(() => Reflect.deleteProperty(globals, 'toolbarAttrs'));
@@ -153,8 +153,7 @@ test('Straighten measurement and framing toolbars are not scrollable; ordinary C
         disabled: false, dragging: false, valid: true, unchanged: false, angle: 5, snapToPixel: false,
     };
     const cases: [string, Component, Record<string, unknown>, string][] = [
-        ['measurement', await loadRecordingControls('StraightenControls.vue'), { canStraighten: true, disabled: false, canApply: true, valid: true, angle: 1 }, 'Straighten toolbar'],
-        ['framing', await loadRecordingControls('CropControls.vue'), { ...cropProps, straighten: true }, 'Straighten toolbar'],
+        ['straighten', await loadRecordingControls('CropControls.vue'), { ...cropProps, straighten: true }, 'Straighten toolbar'],
         ['crop', await loadRecordingControls('CropControls.vue'), cropProps, 'Crop toolbar'],
     ];
     for (const [name, component, props, label] of cases) {

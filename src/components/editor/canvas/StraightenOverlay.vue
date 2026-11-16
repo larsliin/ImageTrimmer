@@ -2,13 +2,12 @@
     import { computed, onBeforeUnmount, shallowRef, useTemplateRef, watch } from 'vue';
     import CropOverlay from './CropOverlay.vue';
     import { useToolDraft } from '@/composables/useToolDraft';
-    import { constrainCropInsideRotatedImage, isCropInsideRotatedImage, isValidCrop, previewToImagePoint, type CropRect, type Point } from '@/lib/crop';
+    import { previewToImagePoint, type CropRect, type Point } from '@/lib/crop';
     import {
         isValidLevelAngle, levelingAngle, levelLineProblem,
-        sourceToStraightenedPoint, straightenCrop, straightenedToSourcePoint,
+        sourceToStraightenedPoint, straightenedToSourcePoint,
     } from '@/lib/straighten';
     import type { Size } from '@/lib/zoom';
-    import StraightenControls from '../controls/StraightenControls.vue';
 
     const props = defineProps<{
         image: Size
@@ -27,8 +26,6 @@
     const cursor = shallowRef<Point | null>(null);
     const keyboardCursorActive = shallowRef(false);
     const angle = shallowRef(0);
-    const initialCrop = shallowRef<CropRect | null>(null);
-    const framingDirty = shallowRef(false);
     const lineProblem = shallowRef<string | null>(null);
     const announcement = shallowRef('');
     const surface = useTemplateRef<HTMLDivElement>('surface');
@@ -46,22 +43,11 @@
     }
     const placementGesture = shallowRef<PlacementGesture | null>(null);
     let suppressedClick: SuppressedClick | null = null;
-    const reportDirty = (measurementDirty: boolean) => emit('dirty', measurementDirty || framingDirty.value);
-    const measurementDirty = useToolDraft(() => ({ tool: 'straighten', points: points.value, angle: angle.value }), reportDirty);
-    watch(framingDirty, () => reportDirty(measurementDirty.value), { flush: 'sync' });
+    useToolDraft(() => ({ tool: 'straighten', points: points.value, angle: angle.value }), value => emit('dirty', value));
     const angleValue = computed(() => typeof angle.value === 'number' ? angle.value : Number.NaN);
     const previewAngle = computed(() => isValidLevelAngle(angleValue.value) ? angleValue.value : null);
-    const measurementCrop = computed(() => previewAngle.value === null ? null
-        : constrainCropInsideRotatedImage(straightenCrop(props.image, previewAngle.value), props.image, previewAngle.value));
-    const canApply = computed(() => {
-        const crop = measurementCrop.value;
-        // An automatic zero-degree crop is full frame, regardless of guide/discard history.
-        return !props.disabled && initialCrop.value === null && previewAngle.value !== null
-            && previewAngle.value !== 0 && crop !== null && isValidCrop(crop, props.image)
-            && isCropInsideRotatedImage(crop, props.image, previewAngle.value);
-    });
     const displayedAngle = shallowRef(0);
-    const canPlace = computed(() => !props.disabled && !props.panMode && initialCrop.value === null && points.value.length < 2);
+    const canPlace = computed(() => !props.disabled && !props.panMode && points.value.length < 2);
     const guideCorrection = computed(() => {
         const [first, second] = points.value;
         if (!first || !second || lineProblem.value
@@ -163,13 +149,7 @@
     function straighten() {
         if (!canStraighten.value || guideCorrection.value === null) return;
         angle.value = guideCorrection.value;
-        initialCrop.value ??= straightenCrop(props.image, angle.value);
-        announce('Reference line leveled. Straighten is disabled while level. Adjust crop or angle, then select Apply straighten.');
-    }
-
-    function applyMeasurement() {
-        if (!canApply.value || !measurementCrop.value || previewAngle.value === null) return;
-        emit('apply', { ...measurementCrop.value }, previewAngle.value);
+        announce('Reference line leveled. Straighten is disabled while level. Adjust the angle, then select Apply straighten.');
     }
 
     function consumeSuppressedClick(event: MouseEvent): boolean {
@@ -185,7 +165,8 @@
     }
 
     function placePointerPoint(event: MouseEvent) {
-        if (consumeSuppressedClick(event) || event.detail === 0 || !canPlace.value || event.button !== 0) return;
+        if (event.target !== event.currentTarget || consumeSuppressedClick(event)
+            || event.detail === 0 || !canPlace.value || event.button !== 0) return;
         const clicked = pointFrom(event);
         if (clicked) placePoint(clicked.point, clicked.display);
     }
@@ -193,7 +174,7 @@
     function beginPointerPlacement(event: PointerEvent) {
         if (event.button !== 0 || event.isPrimary === false) return;
         suppressedClick = null;
-        if (event.target !== event.currentTarget || !canPlace.value) return;
+        if (event.target !== event.currentTarget || !canPlace.value || placementGesture.value) return;
         const start = pointFrom(event);
         const element = surface.value;
         if (!start || !element) return;
@@ -277,7 +258,7 @@
     function trackCursor(event: PointerEvent) {
         if (placementGesture.value) {
             updatePointerPlacement(event);
-        } else if (points.value.length === 1 && canPlace.value) {
+        } else if (event.target === event.currentTarget && points.value.length === 1 && canPlace.value) {
             cursor.value = pointFrom(event)?.point ?? null;
         }
     }
@@ -326,11 +307,11 @@
     <div
         ref="surface"
         class="straighten-surface"
-        :class="{ 'is-placing': canPlace, 'is-framing': initialCrop }"
+        :class="{ 'is-placing': canPlace }"
         role="group"
         aria-label="Straighten image interaction"
         aria-describedby="straighten-image-instructions"
-        :tabindex="initialCrop ? undefined : 0"
+        tabindex="0"
         @keydown.esc.prevent.stop="cancelTool"
         @click="placePointerPoint"
         @pointerdown="beginPointerPlacement"
@@ -342,18 +323,14 @@
         @keydown="onSurfaceKeydown"
     >
         <CropOverlay
-            v-if="initialCrop"
             v-model:angle="angle"
             :image="image"
-            :initial-crop="initialCrop"
-            :disabled="disabled"
+            :disabled="disabled || placementGesture !== null"
             :pan-mode="panMode"
             :can-straighten="canStraighten"
             straighten
-            focus-on-mount
             @apply="(crop, value) => emit('apply', crop, value)"
             @cancel="cancelTool"
-            @dirty="framingDirty = $event"
             @straighten="straighten"
         ></CropOverlay>
         <span id="straighten-image-instructions" class="visually-hidden">
@@ -367,13 +344,14 @@
             to move farther. After
             setting the line, the image does not rotate; select the Straighten
             button to level the measured line. Straighten stays available during
-            framing, disabled while the line is level. Changing the angle away
+            editing, disabled while the line is level. Changing the angle away
             from level enables it again; reapplying restores the measured
             correction, and the crop fits automatically. You can also set the Angle
             slider or numeric field before or after measuring and apply directly without a reference line.
             Apply straighten is always visible, enabled only for a valid changed crop or angle.
-            Setting a reference line alone does not enable Apply. In framing, drag one of the four corner handles to rotate
-            the image around its center. Dragging inside or outside the crop does nothing; the crop fits automatically.
+            Setting a reference line alone does not enable Apply. From the moment Straighten opens, drag one of the four corner handles to rotate
+            the image around its center, or draw an optional reference line elsewhere on the image, in either order.
+            The crop fits automatically and cannot be resized.
             Corner arrow keys rotate by 0.1 degrees, or 1 degree with Shift.
             The crop stays inside the rotated image automatically. Use the
             Angle slider or numeric field for precise rotation. Press Enter in
@@ -405,17 +383,6 @@
         ></span>
         <span v-if="lineProblem" class="visually-hidden" role="alert">{{ lineProblem }}</span>
         <span class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">{{ announcement }}</span>
-        <StraightenControls
-            v-if="!initialCrop"
-            v-model:angle="angle"
-            :disabled="disabled"
-            :can-straighten="canStraighten"
-            :can-apply="canApply"
-            :valid="previewAngle !== null"
-            @straighten="straighten"
-            @apply="applyMeasurement"
-            @cancel="cancelTool"
-        />
     </div>
 </template>
 
@@ -431,12 +398,9 @@
     cursor: crosshair;
 }
 
-.straighten-surface.is-framing {
-    pointer-events: none;
-}
-
+/* The frame and shading are visual only; corner handles retain their own hit targets. */
 .straighten-surface :deep(.crop-surface) {
-    pointer-events: auto;
+    pointer-events: none;
 }
 
 .straighten-surface:focus-visible {
