@@ -24,7 +24,7 @@ keyboard shortcuts, exporting, and tips for using the editor in narrow windows.
 ## Tech stack
 
 - Vue 3 and TypeScript
-- Shared Vue controls from the committed library npm archive in `../packages/4f15209/`
+- Shared Vue controls from a versioned GitHub Release of the component library
 - Vite
 - Browser image APIs, including `ImageBitmap` and Canvas 2D
 - Node.js built-in test runner, ESLint, and Stylelint
@@ -52,9 +52,10 @@ npm run dev
 
 Vite prints the local development URL after startup.
 
-The shared library dependency is installed from
-`../packages/4f15209/chrome-extension-component-library-0.0.0.tgz`. Keep that
-archive alongside the workspace when reinstalling dependencies.
+The shared library is downloaded automatically from the pinned `v0.1.0` GitHub
+Release. No library checkout, sibling `packages/` directory, or GitHub login is
+needed. Commit `package.json` and `package-lock.json` together when updating its
+release URL. Use `npm ci` for an exact lockfile install.
 
 ## Common commands
 

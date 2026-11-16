@@ -43,7 +43,7 @@ or backend services unless explicitly requested.
 - Use the existing Vite setup and npm scripts. Prefer browser APIs for image
   processing; add dependencies only when they provide a clear benefit.
 - Prefer equivalent controls from `chrome-extension-component-library`
-  (`github:larsliin/ChromeExtensionsComponentLibrary#main`) over new local
+  (installed from a pinned GitHub Release archive) over new local
   primitives. Use BaseButton for text actions and BaseIconButton for icon
   actions/toggles with accessible labels and optional pressed state. Import
   library CSS only in `src/main.ts`, before app CSS; it includes Bootstrap Icons.
