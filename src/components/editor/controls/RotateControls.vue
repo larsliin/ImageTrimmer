@@ -3,7 +3,7 @@
     import { nextTick, onBeforeUnmount, onMounted, shallowRef, useTemplateRef } from 'vue';
     import type { QuarterTurns } from '@/lib/rotate';
     import FloatingToolbar from '../chrome/FloatingToolbar.vue';
-    import { BaseIconButton } from 'chrome-extension-component-library';
+    import { BaseAlert, BaseIconButton } from 'chrome-extension-component-library';
 
     const props = defineProps<{
         disabled: boolean
@@ -95,7 +95,7 @@
                         <i class="bi bi-x-lg" aria-hidden="true"></i>
                     </BaseIconButton>
                 </fieldset>
-                <p v-if="error" class="rotate-error" role="alert">{{ error }}</p>
+                <BaseAlert v-if="error" class="rotate-error" :message="error" />
                 <p v-if="disabled" class="rotate-status" role="status">Processing image...</p>
             </form>
         </FloatingToolbar>
@@ -144,7 +144,6 @@
 .rotate-error {
     max-width: 400px;
     white-space: normal;
-    color: #fecaca;
 }
 
 .rotate-status {

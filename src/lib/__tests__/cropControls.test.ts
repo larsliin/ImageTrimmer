@@ -92,7 +92,7 @@ test('Straighten hides crop geometry, Snap, and Reset angle; ordinary Crop retai
     const renderScript = compileScript(parse(renderSource).descriptor, { id: 'crop-controls-render-test', inlineTemplate: true }).content
         .replace("import FloatingToolbar from '../chrome/FloatingToolbar.vue';",
             'const FloatingToolbar = { inheritAttrs: false, setup: (_props, { slots }) => () => slots.default?.() };')
-        .replace("import { BaseIconButton } from 'chrome-extension-component-library';", "const BaseIconButton = 'button';")
+        .replace("import { BaseAlert, BaseIconButton } from 'chrome-extension-component-library';", "const BaseAlert = 'div'; const BaseIconButton = 'button';")
         .replaceAll(/import (Base\w+) from '[^']+';/g, "const $1 = 'input';");
     const renderCompiled = transpileModule(renderScript, { compilerOptions: { module: ModuleKind.ESNext } }).outputText
         .replaceAll(/(['"])vue\1/g, JSON.stringify(import.meta.resolve('vue')))
@@ -135,7 +135,7 @@ async function loadRecordingControls(file: string): Promise<Component> {
     const renderScript = compileScript(parse(renderSource).descriptor, { id: `toolbar-props-${file}`, inlineTemplate: true }).content
         .replace("import FloatingToolbar from '../chrome/FloatingToolbar.vue';",
             'const FloatingToolbar = { inheritAttrs: false, setup: (_props, { slots, attrs }) => () => { globalThis.toolbarAttrs.push({ ...attrs }); return slots.default?.(); } };')
-        .replace("import { BaseIconButton } from 'chrome-extension-component-library';", "const BaseIconButton = 'button';")
+        .replace("import { BaseAlert, BaseIconButton } from 'chrome-extension-component-library';", "const BaseAlert = 'div'; const BaseIconButton = 'button';")
         .replaceAll(/import (Base\w+) from '[^']+';/g, "const $1 = 'input';");
     const compiled = transpileModule(renderScript, { compilerOptions: { module: ModuleKind.ESNext } }).outputText
         .replaceAll(/(['"])vue\1/g, JSON.stringify(import.meta.resolve('vue')))

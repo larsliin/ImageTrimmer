@@ -4,7 +4,7 @@
     import { MAX_RESIZE_DIMENSION, dimensionForPercentage, heightForWidth, isValidResize, widthForHeight } from '@/lib/resize';
     import type { Size } from '@/lib/zoom';
     import FloatingToolbar from '../chrome/FloatingToolbar.vue';
-    import { BaseIconButton } from 'chrome-extension-component-library';
+    import { BaseAlert, BaseIconButton } from 'chrome-extension-component-library';
     import BaseNumberInput from '@/components/bascomponents/BaseNumberInput.vue';
 
     const props = defineProps<{
@@ -145,10 +145,12 @@
                         </BaseIconButton>
                     </div>
                 </fieldset>
-                <p v-if="!valid" class="validation-message" role="alert">
-                    Enter whole-pixel dimensions between 1 and {{ MAX_RESIZE_DIMENSION }} px, or positive percentages within those bounds.
-                </p>
-                <p v-if="error" class="validation-message" role="alert">{{ error }}</p>
+                <BaseAlert
+                    v-if="!valid"
+                    class="resize-alert"
+                    :message="`Enter whole-pixel dimensions between 1 and ${MAX_RESIZE_DIMENSION} px, or positive percentages within those bounds.`"
+                />
+                <BaseAlert v-if="error" class="resize-alert" :message="error" />
                 <p v-if="disabled" class="resize-status" role="status">Processing image...</p>
             </form>
         </FloatingToolbar>
@@ -199,10 +201,9 @@
     outline-offset: 0;
 }
 
-.validation-message {
+.resize-alert {
     max-width: 600px;
     white-space: normal;
-    color: #fecaca;
 }
 
 .resize-status {

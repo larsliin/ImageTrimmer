@@ -1,7 +1,7 @@
 <script setup lang="ts">
     import { nextTick, onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
     import FloatingToolbar from '../chrome/FloatingToolbar.vue';
-    import { BaseIconButton } from 'chrome-extension-component-library';
+    import { BaseAlert, BaseIconButton } from 'chrome-extension-component-library';
     import BaseNumberInput from '@/components/bascomponents/BaseNumberInput.vue';
     import BaseRangeInput from '@/components/bascomponents/BaseRangeInput.vue';
     import { isValidBrushSettings, type BrushSettings } from '@/lib/brush';
@@ -104,7 +104,7 @@
                         <i class="bi bi-x-lg" aria-hidden="true"></i>
                     </BaseIconButton>
                 </fieldset>
-                <p v-if="error" class="brush-controls__error" role="alert">{{ error }}</p>
+                <BaseAlert v-if="error" class="brush-controls__error" :message="error" />
                 <p v-if="disabled" class="brush-controls__status" role="status">Processing image...</p>
             </form>
         </FloatingToolbar>
@@ -217,12 +217,17 @@
     outline-offset: 2px;
 }
 
-.brush-controls__error {
-    flex: 0 0 auto;
-    margin: 0;
-    color: #fecaca;
+.brush-controls__error.alert {
+    flex: 0 1 auto;
+    gap: 4px;
+    max-width: 240px;
+    padding: 2px 4px;
     font-size: 12px;
-    white-space: nowrap;
+    white-space: normal;
+}
+
+.brush-controls__error :deep(.alert-icon) {
+    font-size: 12px;
 }
 
 .brush-controls__status {

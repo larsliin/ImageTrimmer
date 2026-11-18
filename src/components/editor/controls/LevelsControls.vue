@@ -13,7 +13,7 @@
         type LevelsParams,
     } from '@/lib/levels';
     import ToolModal from '../dialogs/ToolModal.vue';
-    import { BaseButton } from 'chrome-extension-component-library';
+    import { BaseAlert, BaseButton } from 'chrome-extension-component-library';
     import BaseNumberInput from '@/components/bascomponents/BaseNumberInput.vue';
     import BaseCheckbox from '@/components/bascomponents/BaseCheckbox.vue';
 
@@ -235,9 +235,10 @@
                 </label>
             </div>
 
-            <p v-if="!valid" class="validation-message" role="alert">
-                Shadows must be below highlights (0–255), and midtones between {{ MIN_GAMMA }} and {{ MAX_GAMMA }}.
-            </p>
+            <BaseAlert
+                v-if="!valid"
+                :message="`Shadows must be below highlights (0–255), and midtones between ${MIN_GAMMA} and ${MAX_GAMMA}.`"
+            />
             <div class="footer-row">
                 <BaseButton variant="secondary" class="reset-button" :disabled="unchanged" @click="reset">Reset</BaseButton>
                 <label class="preview-toggle">
@@ -360,10 +361,6 @@
     align-self: flex-start;
     min-height: 30px;
     padding: 4px 10px;
-}
-
-.validation-message {
-    color: #fecaca;
 }
 
 @media (max-width: 1440px), (max-height: 800px) {

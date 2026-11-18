@@ -4,7 +4,7 @@
     import { MAX_LEVEL_ANGLE } from '@/lib/straighten';
     import type { Size } from '@/lib/zoom';
     import FloatingToolbar from '../chrome/FloatingToolbar.vue';
-    import { BaseIconButton } from 'chrome-extension-component-library';
+    import { BaseAlert, BaseIconButton } from 'chrome-extension-component-library';
     import BaseRangeInput from '@/components/bascomponents/BaseRangeInput.vue';
     import BaseCheckbox from '@/components/bascomponents/BaseCheckbox.vue';
     import BaseNumberInput from '@/components/bascomponents/BaseNumberInput.vue';
@@ -109,11 +109,8 @@
                             <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
                         </BaseIconButton>
                     </div>
-                    <p v-if="!valid && !dragging" class="crop-error" role="alert"
-                        :title="straighten ? validationMessage : `Enter a non-empty crop inside the image bounds and an angle within ±${maxAngle}°.`">
-                        <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
-                        {{ validationMessage }}
-                    </p>
+                    <BaseAlert v-if="!valid && !dragging" class="crop-error" :message="validationMessage"
+                        :title="straighten ? validationMessage : `Enter a non-empty crop inside the image bounds and an angle within ±${maxAngle}°.`" />
                     <div class="crop-actions">
                         <span class="crop-divider" role="separator" aria-orientation="vertical"></span>
                         <BaseIconButton variant="primary" type="submit" class="icon-button" :label="`Apply ${actionName}`"
@@ -143,13 +140,18 @@
     white-space: nowrap;
 }
 
-.crop-error {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 0 0 0 auto;
+.crop-error.alert {
+    flex: 0 1 auto;
+    gap: 4px;
+    max-width: 240px;
+    margin-left: auto;
+    padding: 2px 4px;
     font-size: 12px;
-    color: #ffa3a3;
+    white-space: normal;
+}
+
+.crop-error :deep(.alert-icon) {
+    font-size: 12px;
 }
 
 .crop-error + .crop-actions {

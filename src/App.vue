@@ -1,5 +1,6 @@
 <script setup lang="ts">
     import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
+    import { BaseDialog } from 'chrome-extension-component-library';
     import EditorTopBar from './components/editor/chrome/EditorTopBar.vue';
     import EditorToolRail from './components/editor/chrome/EditorToolRail.vue';
     import EditorCanvas from './components/editor/canvas/EditorCanvas.vue';
@@ -25,7 +26,6 @@
     import type { PreparedExport } from './lib/imageIO';
     import type { ColorMode } from './lib/colorMode';
     import { useBrushTools } from './composables/useBrushTools';
-    import DiscardChangesDialog from './components/editor/dialogs/DiscardChangesDialog.vue';
     import { useToolCloseGuard } from './composables/useToolCloseGuard';
     import { isFloatingTool } from './lib/toolDraft';
     import { hasShortcutModifier } from './lib/shortcuts';
@@ -420,12 +420,20 @@
             @apply="applyBrightnessContrast"
             @cancel="activeTool = null"
         />
-        <DiscardChangesDialog
-            v-if="pendingIntent"
-            :tool-name="toolName"
-            @keep="guard.keepEditing"
-            @discard="guard.discardChanges"
-        />
+        <!-- Teleported out of the inert `.editor`; open state is owned by the guard, so `update:open` is ignored. -->
+        <Teleport to="body">
+            <BaseDialog
+                :open="pendingIntent !== null"
+                mode="confirm"
+                title="Discard unapplied changes?"
+                :message="`Your changes in ${toolName} haven’t been applied. Discard them and close this tool?`"
+                cancel-label="Keep editing"
+                confirm-label="Discard changes"
+                confirm-variant="danger"
+                @cancel="guard.keepEditing"
+                @confirm="guard.discardChanges"
+            />
+        </Teleport>
         <BrushControls
             v-if="activeTool === 'brush' && bitmap"
             :settings="brushSettings"

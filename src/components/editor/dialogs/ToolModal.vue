@@ -3,7 +3,7 @@
     import { useDragOffset } from '@/composables/useDragOffset';
     import type { Point } from '@/lib/crop';
     import { clampGripOffset } from '@/lib/drag';
-    import { BaseButton } from 'chrome-extension-component-library';
+    import { BaseAlert, BaseButton } from 'chrome-extension-component-library';
 
     const props = withDefaults(defineProps<{
         title: string
@@ -138,7 +138,7 @@
                 <fieldset class="tool-modal__fields" :disabled="busy">
                     <slot />
                 </fieldset>
-                <p v-if="error" class="tool-modal__error" role="alert">{{ error }}</p>
+                <BaseAlert v-if="error" :message="error" />
                 <p v-if="busy" class="tool-modal__status" role="status">Processing image...</p>
                 <footer class="tool-modal__actions">
                     <BaseButton variant="bare" class="tool-modal__button" :disabled="busy" @click="cancel">Cancel</BaseButton>
@@ -274,10 +274,6 @@
     min-width: 0;
     padding: 0;
     border: 0;
-}
-
-.tool-modal__error {
-    color: #fecaca;
 }
 
 .tool-modal__status {
